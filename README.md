@@ -1,145 +1,276 @@
-PatternNET - .NET 8 Clean Architecture Template
+# PatternNET – .NET 8 Clean Architecture Template
 
-PatternNET adalah template starter-kit untuk membangun aplikasi Backend yang scalable, modular, dan mudah di-maintain menggunakan teknologi .NET 8.
+PatternNET adalah **starter template** untuk membangun aplikasi backend .NET 8 yang **scalable, modular, dan mudah di‑maintain** menggunakan prinsip **Domain‑Driven Design (DDD)** dan **Clean Architecture**.
 
-Project ini menerapkan prinsip Domain-Driven Design (DDD) dan Clean Architecture secara ketat, memisahkan aturan bisnis murni dari kerumitan teknis (seperti Database atau Framework).
+Template ini dirancang agar:
 
-🚀 Teknologi Utama
+* aturan bisnis (Domain) **terpisah total** dari detail teknis (DB, framework),
+* struktur konsisten dan mudah di‑copy untuk project berikutnya,
+* siap dikembangkan menjadi **Microservices** bila dibutuhkan.
 
-Project ini dibangun menggunakan stack teknologi modern standar industri:
+---
 
-Framework: .NET 8 (LTS)
+## 🚀 Teknologi Utama
 
-Language: C# 12
+* **Framework**: .NET 8 (LTS)
+* **Language**: C# 12
+* **Database**: Entity Framework Core 8 (SQL Server)
+* **Architecture**: Clean Architecture + DDD
+* **Pattern**: CQRS (Command & Query Separation)
+* **Validation**: Domain Validation (Entity & Value Object)
+* **Dependency Injection**: Native .NET DI
+* **API Docs**: Swagger / OpenAPI
 
-Database: Entity Framework Core 8 (SQL Server)
+---
 
-Pola Desain: CQRS (Command Query Responsibility Segregation) via MediatR
+## 📂 Struktur Arsitektur
 
-Validasi: Domain Validations
+> **Dependency Rule**
+> Layer bagian dalam **tidak boleh bergantung** pada layer luar.
 
-Dokumentasi API: Swagger UI (OpenAPI)
+```
+src
+└─ Modules
+   └─ PatternNET
+      ├─ PatternNET.Domain
+      ├─ PatternNET.Application
+      ├─ PatternNET.Infrastructure
+      └─ PatternNET.API
+```
 
-Dependency Injection: Native .NET DI Container
+---
 
-📂 Struktur Arsitektur
+## 1️⃣ PatternNET.Domain – Jantung Aplikasi ❤️
 
-Struktur solusi ini mengikuti aturan Dependency Rule: Layer dalam tidak boleh bergantung pada layer luar.
+Layer terdalam. **Tidak bergantung pada project lain**.
+Hanya berisi aturan bisnis murni.
 
-src/Modules/PatternNET
-│
-├── 1. PatternNET.Domain (Jantung Aplikasi) ❤️
-│   │  Layer terdalam. Murni logic C#, tidak ada dependency ke project lain.
-│   ├── Entities/       # Object bisnis utama (misal: ContactMessage.cs)
-│   ├── ValueObjects/   # Object tanpa identitas
-│   ├── Events/         # Domain Events (Komunikasi antar domain)
-│   └── Exceptions/     # Error khusus bisnis
-│
-├── 2. PatternNET.Application (Otak Aplikasi) 🧠
-│   │  Mengatur alur kerja (Orchestration). Bergantung HANYA pada Domain.
-│   ├── UseCases/       # Logika fitur (Commands & Queries)
-│   ├── Interfaces/     # Kontrak Repository (IRepository)
-│   └── DependencyInjection.cs
-│
-├── 3. PatternNET.Infrastructure (Gudang & Alat) 🏭
-│   │  Implementasi teknis. Bergantung pada Domain & Application.
-│   ├── Persistence/    # DbContext & Konfigurasi Tabel EF Core
-│   ├── Repositories/   # Implementasi Interface Repository
-│   └── DependencyInjection.cs
-│
-└── 4. PatternNET.API (Pintu Depan) 🚪
-    │  Entry point aplikasi. Bergantung pada Application & Infrastructure.
-    ├── Controllers/    # Menerima HTTP Request
-    ├── Dtos/           # Request/Response Json Contract
-    └── Program.cs      # Konfigurasi awal (Startup)
+```
+PatternNET.Domain
+├─ Entities        # Objek bisnis utama (punya identitas)
+├─ ValueObjects    # Nilai penting tanpa identitas
+├─ Events          # Domain Events (opsional)
+└─ Exceptions      # Error khusus bisnis
+```
 
+**Aturan penting:**
 
-🛠️ Prasyarat (Requirements)
+* ❌ Tidak boleh ada EF Core
+* ❌ Tidak boleh ada HTTP / Controller
+* ❌ Tidak boleh ada LINQ ke DB
 
-Pastikan komputer Anda sudah terinstall:
+**Contoh isi:**
 
-.NET 8 SDK
+* `ContactMessage.cs`
+* `Email.cs`
+* `DomainException.cs`
 
-SQL Server Express (atau LocalDB)
+---
 
-Visual Studio 2022 atau VS Code.
+## 2️⃣ PatternNET.Application – Otak Aplikasi 🧠
 
-Git.
+Mengatur **alur kerja (use case)**.
+Bergantung **hanya pada Domain**.
 
-⚡ Cara Menjalankan (Getting Started)
+```
+PatternNET.Application
+├─ UseCases
+│  ├─ Commands      # Aksi tulis (Create, Update, Delete)
+│  └─ Queries       # Aksi baca (Get, List)
+├─ Interfaces       # Kontrak Repository
+└─ DependencyInjection.cs
+```
 
-Ikuti langkah ini untuk menjalankan aplikasi di mesin lokal.
+**Aturan penting:**
 
-1. Clone Repository
+* ✔ Mengatur urutan proses
+* ✔ Memanggil Domain
+* ✔ Memanggil Repository (via interface)
+* ❌ Tidak ada EF Core / SQL
 
-git clone [https://github.com/USERNAME/PatternNET.git](https://github.com/USERNAME/PatternNET.git)
+---
+
+## 3️⃣ PatternNET.Infrastructure – Gudang & Alat 🏭
+
+Berisi **implementasi teknis**.
+Bergantung pada Domain & Application.
+
+```
+PatternNET.Infrastructure
+├─ Persistence
+│  ├─ Configurations   # Mapping Entity → Table (Fluent API)
+│  ├─ Repositories     # Implementasi IRepository
+│  └─ AppDbContext.cs
+├─ Migrations          # Versi perubahan struktur DB
+└─ DependencyInjection.cs
+```
+
+**Aturan penting:**
+
+* ✔ EF Core di sini
+* ✔ LINQ ke DB di sini
+* ❌ Tidak ada aturan bisnis
+
+---
+
+## 4️⃣ PatternNET.API – Pintu Depan 🚪
+
+Entry point aplikasi.
+Menangani HTTP Request & Response.
+
+```
+PatternNET.API
+├─ Controllers     # Endpoint HTTP
+├─ Dtos
+│  ├─ Requests     # Input JSON
+│  └─ Responses    # Output JSON
+└─ Program.cs      # Startup & konfigurasi
+```
+
+**Aturan penting:**
+
+* ✔ Mapping DTO → Command
+* ✔ Panggil UseCase
+* ❌ Tidak ada query DB
+* ❌ Tidak ada aturan bisnis
+
+---
+
+## 🔁 Alur Request (Flow Standar)
+
+```
+Client
+ ↓
+API (Controller)
+ ↓
+Application (UseCase)
+ ↓
+Domain (Validasi & Aturan)
+ ↓
+Infrastructure (EF Core / DB)
+ ↓
+Database
+ ↓
+Response kembali ke API
+```
+
+---
+
+## 🛠️ Prasyarat (Requirements)
+
+* .NET 8 SDK
+* SQL Server / SQL Server Express / LocalDB
+* Visual Studio 2022 atau VS Code
+* Git
+
+---
+
+## ⚡ Cara Menjalankan (Getting Started)
+
+### 1. Clone Repository
+
+```
+git clone https://github.com/USERNAME/PatternNET.git
 cd PatternNET
+```
 
+---
 
-2. Konfigurasi Database
+### 2. Konfigurasi Database
 
-Buka file src/Modules/PatternNET/PatternNET.API/appsettings.json.
-Sesuaikan ConnectionStrings dengan server database lokal Anda.
+Edit file:
 
+```
+src/Modules/PatternNET/PatternNET.API/appsettings.json
+```
+
+Contoh:
+
+```json
 "ConnectionStrings": {
   "DefaultConnection": "Server=localhost;Database=PatternNET_Db;Trusted_Connection=True;TrustServerCertificate=True;"
 }
+```
+
+---
+
+### 3. Jalankan Migration (Wajib)
+
+Karena **Infrastructure terpisah dari API**, perintah migration harus eksplisit:
+
+```
+dotnet ef migrations add InitialCreate \
+  --project PatternNET.Infrastructure \
+  --startup-project PatternNET.API
 
 
-3. Jalankan Migrasi (Wajib)
+dotnet ef database update \
+  --project PatternNET.Infrastructure \
+  --startup-project PatternNET.API
+```
 
-Karena kita memisahkan project Infrastructure (Tempat DB) dan API (Tempat Startup), perintah migrasinya harus spesifik.
+---
 
-Buka terminal di folder src/Modules/PatternNET, lalu jalankan:
+### 4. Jalankan Aplikasi
 
-# 1. Membuat file migrasi baru (Snapshot)
-dotnet ef migrations add InitialCreate --project PatternNET.Infrastructure --startup-project PatternNET.API
-
-# 2. Menerapkan ke Database SQL Server (Update DB)
-dotnet ef database update --project PatternNET.Infrastructure --startup-project PatternNET.API
-
-
-4. Jalankan Aplikasi
-
+```
 dotnet run --project PatternNET.API
+```
 
+Akses Swagger UI:
 
-Akses Swagger UI di: https://localhost:7XXX/swagger/index.html
+```
+https://localhost:7XXX/swagger/index.html
+```
 
-📝 Panduan Pengembangan (How-To)
+---
 
-Ingin menambahkan fitur baru? Ikuti alur "Dari Dalam ke Luar" ini agar kodingan tetap rapi.
+## 🧑‍💻 Panduan Pengembangan Fitur Baru
 
-Contoh: Menambah Fitur "Simpan Produk"
+Gunakan prinsip **dari dalam ke luar**.
 
-Domain:
+### Contoh: Menambah Fitur "Create Product"
 
-Buat Product.cs di folder Entities. Pastikan ada validasi logic di constructor-nya.
+**1. Domain**
 
-Application:
+* Buat `Product.cs` (Entity)
+* Tambahkan validasi di constructor
 
-Buat IProductRepository.cs di Interfaces.
+**2. Application**
 
-Buat CreateProductCommand dan CreateProductHandler di UseCases.
+* Buat `IProductRepository`
+* Buat `CreateProductCommand` & `CreateProductHandler`
 
-Infrastructure:
+**3. Infrastructure**
 
-Buat konfigurasi tabel EF Core di Persistence.
+* Buat konfigurasi EF Core
+* Implementasi `ProductRepository`
+* Jalankan migration
 
-Implementasikan ProductRepository.cs.
+**4. API**
 
-Jalankan perintah dotnet ef migrations add AddProductEntity ....
+* Buat `CreateProductRequest`
+* Buat `ProductController`
 
-API:
+---
 
-Buat CreateProductRequest.cs (DTO).
+## 🧭 Aturan Emas Penempatan Kode
 
-Buat ProductController.cs dan panggil Handler via MediatR.
+| Jika menulis…   | Taruh di       |
+| --------------- | -------------- |
+| Aturan bisnis   | Domain         |
+| Urutan proses   | Application    |
+| EF / LINQ / SQL | Infrastructure |
+| HTTP / JSON     | API            |
 
-🤝 Kontribusi
+---
 
-Jika ingin mengembangkan template ini, silakan Fork repository ini dan buat Pull Request baru.
+## 🤝 Kontribusi
 
-📄 Lisensi
+Silakan fork repository ini dan buat Pull Request jika ingin mengembangkan template.
 
-Project ini dilisensikan di bawah MIT License.
+---
+
+## 📄 Lisensi
+
+Template ini menggunakan **MIT License**.
