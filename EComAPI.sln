@@ -8,6 +8,9 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Modules", "Modules", "{80EB76F2-BF5A-4A7A-94BF-55527E655553}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "EComAPI", "EComAPI", "{2429DE20-DF60-476C-86A6-D79B0CCDB6BC}"
+	ProjectSection(SolutionItems) = preProject
+		ERD_EComAPI.md = ERD_EComAPI.md
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EComAPI.API", "EComAPI.API\EComAPI.API.csproj", "{D06CF92A-01C4-4A9B-ABB8-5499D2524AF7}"
 EndProject
