@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug EComAPI.API",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/EComAPI.API/bin/Debug/net8.0/EComAPI.API.dll",
+      "cwd": "${workspaceFolder}/EComAPI.API",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "preLaunchTask": "build-api",
+      "stopAtEntry": false
+    }
+  ]
+}

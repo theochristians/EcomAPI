@@ -4,7 +4,10 @@ namespace EComAPI.Application.Auth.Interfaces
 {
     public interface IRoleRepository
     {
-        Task<Role?> GetByIdAsync(Guid id);
-        Task<Role?> GetByNameAsync(string name);
+        // =========================
+        // QUERY (READ-ONLY)
+        // =========================
+        Task<Role?> GetRoleByIdAsync(Guid id, CancellationToken cancellationToken = default);
+        Task<Role?> GetRoleByNameAsync(string name, CancellationToken cancellationToken = default);
     }
 }

@@ -1,62 +1,153 @@
 ﻿using EComAPI.Domain.Auth.Entities;
-using EComAPI.Infrastructure.Common.Persistence;
+using EComAPI.Infrastructure.Common.Constants;
+using EComAPI.Infrastructure.Common.Persistence.Context;
 using Microsoft.EntityFrameworkCore;
 
 namespace EComAPI.Infrastructure.Auth.Persistence.Seeders
 {
     public static class PermissionSeeder
     {
-        public static async Task SeedAsync(AppDbContext context)
+        public static async Task SeedAsync(AppDbContext appDbContext)
         {
-            // =========================
-            // PERMISSION DEFINITIONS
-            // =========================
-            var permissions = new List<Permission>
-            {
-                // ===== CATEGORY =====
-                new("categories.read", "Category", "Read categories"),
-                new("categories.create", "Category", "Create category"),
-                new("categories.update", "Category", "Update category"),
-                new("categories.delete", "Category", "Delete category"),
-                new("categories.restore", "Category", "Restore category"),
+            Console.WriteLine("🔑 Seeding Roles and Permissions...");
 
-                // ===== PRODUCT =====
-                new("products.read", "Product", "Read products"),
-                new("products.create", "Product", "Create product"),
-                new("products.update", "Product", "Update product"),
-                new("products.delete", "Product", "Delete product"),
-                new("products.restore", "Product", "Restore product")
+            await SeedSystemUserAsync(appDbContext);
+
+            var adminRole = await GetOrCreateRoleAsync(appDbContext, "Admin");
+            var customerRole = await GetOrCreateRoleAsync(appDbContext, "Customer");
+            var permissions = new List<(string name, string category, string description)>
+            {
+                // Categories
+                ("categories.read", "Category", "Read categories"),
+                ("categories.create", "Category", "Create category"),
+                ("categories.update", "Category", "Update category"),
+                ("categories.delete", "Category", "Soft delete category"),
+                ("categories.restore", "Category", "Restore category"),
+
+                // Products
+                ("products.read", "Product", "Read products"),
+                ("products.create", "Product", "Create product"),
+                ("products.update", "Product", "Update product"),
+                ("products.delete", "Product", "Soft delete product"),
+                ("products.restore", "Product", "Restore product"),
+
+                // Users - Admin
+                ("users.read.all", "User", "Admin: Read all users"),
+                ("users.create", "User", "Admin: Create users"),
+                ("users.update.any", "User", "Admin: Update any user"),
+                ("users.delete.any", "User", "Admin: Soft delete any user"),
+                ("users.restore.any", "User", "Admin: Restore any user"),
+                ("users.harddelete.any", "User", "Admin: Permanently delete any user"),
+
+                // Users - Customer
+                ("users.read.own", "User", "Customer: Read own profile"),
+                ("users.update.own", "User", "Customer: Update own profile"),
+                ("users.delete.own", "User", "Customer: Permanently delete own account"),
+
+                // Orders
+                ("orders.read.all", "Order", "Admin: Read all orders"),
+                ("orders.update.any", "Order", "Admin: Update any order"),
+                ("orders.delete.any", "Order", "Admin: Delete any order"),
+                ("orders.read.own", "Order", "Customer: Read own orders"),
+                ("orders.create", "Order", "Customer: Create orders"),
+                ("orders.cancel.own", "Order", "Customer: Cancel own orders"),
             };
 
-            foreach (var permission in permissions)
+            // ===== SEED PERMISSIONS =====
+            var permissionEntities = new List<Permission>();
+            foreach (var (name, category, description) in permissions)
             {
-                var exists = await context.Permissions
-                    .AnyAsync(p => p.Name == permission.Name);
+                var exists = await appDbContext.Permissions
+                    .AnyAsync(p => p.Name == name);
 
                 if (!exists)
                 {
-                    context.Permissions.Add(permission);
+                    var permission = Permission.CreateForSeed(
+                        Guid.NewGuid(),
+                        name,
+                        category,
+                        SystemUsers.SystemUserId,
+                        description
+                    );
+
+                    appDbContext.Permissions.Add(permission);
+                    permissionEntities.Add(permission);
+                    Console.WriteLine($"   ➕ Added permission: {name}");
+                }
+                else
+                {
+                    var permission = await appDbContext.Permissions.FirstAsync(p => p.Name == name);
+                    permissionEntities.Add(permission);
                 }
             }
 
-            await context.SaveChangesAsync();
+            await appDbContext.SaveChangesAsync();
 
-            // =========================
-            // ROLE SEEDING
-            // =========================
-            var adminRole = await GetOrCreateRole(context, "Admin");
-            var customerRole = await GetOrCreateRole(context, "Customer");
+            // ===== ASSIGN PERMISSIONS TO ADMIN =====
+            Console.WriteLine("🔑 Assigning permissions to Admin role...");
+            await AssignPermissionsToRoleAsync(appDbContext, adminRole, permissionEntities);
 
-            // =========================
-            // ASSIGN PERMISSIONS TO ADMIN
-            // =========================
-            await AssignPermissionsToRole(context, adminRole, permissions);
+            // ===== ASSIGN PERMISSIONS TO CUSTOMER =====
+            var customerPermissions = permissionEntities
+                .Where(p =>
+                    p.Name == "products.read" ||
+                    p.Name == "categories.read" ||
+                    p.Name.Contains("own") ||
+                    p.Name == "orders.create"
+                )
+                .ToList();
+
+            Console.WriteLine("🔑 Assigning permissions to Customer role...");
+            await AssignPermissionsToRoleAsync(appDbContext, customerRole, customerPermissions);
+
+            Console.WriteLine("✅ Permission seeding completed!");
         }
 
-        // =========================
-        // HELPERS
-        // =========================
-        private static async Task<Role> GetOrCreateRole(
+        // ===== SEED SYSTEM USER =====
+        private static async Task SeedSystemUserAsync(AppDbContext appDbContext)
+        {
+            var systemUserExists = await appDbContext.Users
+                .IgnoreQueryFilters()
+                .AnyAsync(u => u.Id == SystemUsers.SystemUserId);
+
+            if (systemUserExists)
+            {
+                Console.WriteLine("   ✅ SYSTEM user already exists");
+                return;
+            }
+
+            // Create Admin role first if not exists
+            var adminRole = await appDbContext.Roles
+                .FirstOrDefaultAsync(r => r.Name == "Admin");
+
+            if (adminRole == null)
+            {
+                adminRole = Role.CreateForSeed(
+                    Guid.NewGuid(),
+                    "Admin",
+                    SystemUsers.SystemUserId
+                );
+                appDbContext.Roles.Add(adminRole);
+                await appDbContext.SaveChangesAsync();
+            }
+
+            var systemUser = Domain.Auth.Entities.User.CreateForSeed(
+                SystemUsers.SystemUserId,
+                SystemUsers.SystemUserName,
+                Domain.Auth.ValueObjects.EmailAddress.Create(SystemUsers.SystemUserEmail),
+                Domain.Auth.ValueObjects.PasswordHash.FromHash("SYSTEM_NOT_USABLE"),
+                adminRole.Id,
+                SystemUsers.SystemUserId
+            );
+
+            appDbContext.Users.Add(systemUser);
+            await appDbContext.SaveChangesAsync();
+
+            Console.WriteLine("   ➕ Created SYSTEM user");
+        }
+
+        // ===== GET OR CREATE ROLE =====
+        private static async Task<Role> GetOrCreateRoleAsync(
             AppDbContext context,
             string roleName)
         {
@@ -64,38 +155,54 @@ namespace EComAPI.Infrastructure.Auth.Persistence.Seeders
                 .FirstOrDefaultAsync(r => r.Name == roleName);
 
             if (role != null)
+            {
+                Console.WriteLine($"   ✅ Role '{roleName}' already exists");
                 return role;
+            }
 
-            role = new Role(roleName);
+            role = Role.CreateForSeed(
+                Guid.NewGuid(),
+                roleName,
+                SystemUsers.SystemUserId
+            );
+
             context.Roles.Add(role);
             await context.SaveChangesAsync();
 
+            Console.WriteLine($"   ➕ Created role: {roleName}");
             return role;
         }
 
-        private static async Task AssignPermissionsToRole(
-            AppDbContext context,
+        // ===== ASSIGN PERMISSIONS TO ROLE =====
+        private static async Task AssignPermissionsToRoleAsync(
+            AppDbContext appDbContext,
             Role role,
             List<Permission> permissions)
         {
+            int added = 0;
+            int skipped = 0;
+
             foreach (var permission in permissions)
             {
-                var permissionEntity = await context.Permissions
-                    .FirstAsync(p => p.Name == permission.Name);
-
-                var exists = await context.RolePermissions.AnyAsync(rp =>
+                var exists = await appDbContext.RolePermissions.AnyAsync(rp =>
                     rp.RoleId == role.Id &&
-                    rp.PermissionId == permissionEntity.Id);
+                    rp.PermissionId == permission.Id);
 
                 if (!exists)
                 {
-                    context.RolePermissions.Add(
-                        new RolePermission(role.Id, permissionEntity.Id)
+                    appDbContext.RolePermissions.Add(
+                        new RolePermission(role.Id, permission.Id, SystemUsers.SystemUserId)
                     );
+                    added++;
+                }
+                else
+                {
+                    skipped++;
                 }
             }
 
-            await context.SaveChangesAsync();
+            await appDbContext.SaveChangesAsync();
+            Console.WriteLine($"   ✅ Assigned {added} permissions to '{role.Name}' (skipped {skipped} existing)");
         }
     }
 }

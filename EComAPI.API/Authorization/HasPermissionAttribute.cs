@@ -4,9 +4,12 @@ namespace EComAPI.API.Authorization
 {
     public class HasPermissionAttribute : AuthorizeAttribute
     {
+        public string Permission { get; }
+
         public HasPermissionAttribute(string permission)
         {
-            Policy = $"PERMISSION:{permission}";
+            Permission = permission;
+            Policy = $"HasPermission:{permission}";
         }
     }
 }

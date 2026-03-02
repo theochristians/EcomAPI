@@ -1,4 +1,4 @@
-﻿namespace EComAPI.Application.Common.Results
+﻿namespace EComAPI.Application.Common.Result
 {
     public class Result
     {

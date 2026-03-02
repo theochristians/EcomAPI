@@ -3,6 +3,7 @@
     public record RegisterUserCommand(
         string FullName,
         string Email,
-        string Password
+        string Password,
+        string? Phone = null
     );
 }

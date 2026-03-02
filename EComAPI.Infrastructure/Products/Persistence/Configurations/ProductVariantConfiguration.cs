@@ -1,34 +1,67 @@
-﻿using EComAPI.Domain.Product.Entities;
-using EComAPI.Infrastructure.Common.Persistence.Configurations;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using EComAPI.Domain.Products.Entities; 
 
 namespace EComAPI.Infrastructure.Products.Persistence.Configurations
 {
     public class ProductVariantConfiguration : IEntityTypeConfiguration<ProductVariant>
     {
-        public void Configure(EntityTypeBuilder<ProductVariant> builder)
+        public void Configure(EntityTypeBuilder<ProductVariant> entityTypeBuilder)
         {
-            builder.ToTable("ProductVariants");
+            entityTypeBuilder.ToTable("ProductVariants");
 
-            builder.HasKey(v => v.Id);
+            entityTypeBuilder.HasKey(productVariant => productVariant.Id);
 
-            builder.Property(v => v.Sku)
+            entityTypeBuilder.Property(productVariant => productVariant.ProductId)
+                .IsRequired();
+
+            entityTypeBuilder.Property(productVariant => productVariant.Sku)
                 .IsRequired()
                 .HasMaxLength(50);
 
-            builder.HasIndex(v => v.Sku).IsUnique();
+            entityTypeBuilder.HasIndex(productVariant => productVariant.Sku)
+                .IsUnique();
 
-            builder.Property(v => v.Stock)
-                .HasDefaultValue(0);
+            entityTypeBuilder.Property(productVariant => productVariant.Size)
+                .IsRequired(false);
 
-            builder.Property(v => v.PriceAdjustment)
-                .HasColumnType("decimal(18,2)");
+            entityTypeBuilder.Property(productVariant => productVariant.Color)
+                .IsRequired(false);
 
-            builder.Property(v => v.IsActive)
-                .HasDefaultValue(true);
+            entityTypeBuilder.Property(productVariant => productVariant.PriceAdjustment)
+                .HasColumnType("decimal(18,2)")
+                .IsRequired(false);
 
-            builder.ConfigureAudit();
+            entityTypeBuilder.Property(productVariant => productVariant.Stock)
+                .HasDefaultValue(0)
+                .IsRequired();
+
+            entityTypeBuilder.Property(productVariant => productVariant.IsActive)
+                .HasDefaultValue(true)
+                .IsRequired();
+
+            entityTypeBuilder.HasOne(productVariant => productVariant.Product)
+                .WithMany(product => product.Variants)
+                .HasForeignKey(productVariant => productVariant.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entityTypeBuilder.Property(productVariant => productVariant.CreatedAt)
+                .IsRequired();
+
+            entityTypeBuilder.Property(productVariant => productVariant.CreatedBy)
+                .IsRequired();
+
+            entityTypeBuilder.Property(productVariant => productVariant.UpdatedAt)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(productVariant => productVariant.UpdatedBy)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(productVariant => productVariant.DeletedAt)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(productVariant => productVariant.DeletedBy)
+                .IsRequired(false);
         }
     }
 }

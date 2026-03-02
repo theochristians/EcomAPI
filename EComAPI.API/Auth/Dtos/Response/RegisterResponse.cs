@@ -1,4 +1,4 @@
-﻿namespace EComAPI.API.Auth.DTOs.Responses
+﻿namespace EComAPI.API.Auth.Dtos.Response
 {
     public record RegisterResponse(
         Guid UserId,

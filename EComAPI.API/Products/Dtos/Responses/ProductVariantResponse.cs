@@ -5,7 +5,9 @@
         string Sku,
         int Stock,
         decimal PriceAdjustment,
+        decimal FinalPrice,
         string? Size,
-        string? Color
+        string? Color,
+        bool IsActive
     );
 }

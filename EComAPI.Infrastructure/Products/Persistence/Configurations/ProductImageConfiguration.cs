@@ -1,27 +1,53 @@
-﻿using EComAPI.Domain.Product.Entities;
-using EComAPI.Infrastructure.Common.Persistence.Configurations;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using EComAPI.Domain.Products.Entities; 
 
 namespace EComAPI.Infrastructure.Products.Persistence.Configurations
 {
     public class ProductImageConfiguration : IEntityTypeConfiguration<ProductImage>
     {
-        public void Configure(EntityTypeBuilder<ProductImage> builder)
+        public void Configure(EntityTypeBuilder<ProductImage> entityTypeBuilder)
         {
-            builder.ToTable("ProductImages");
+            entityTypeBuilder.ToTable("ProductImages");
 
-            builder.HasKey(i => i.Id);
+            entityTypeBuilder.HasKey(productImage => productImage.Id);
 
-            builder.Property(i => i.ImageUrl)
+            entityTypeBuilder.Property(productImage => productImage.ProductId)
+                .IsRequired();
+
+            entityTypeBuilder.Property(productImage => productImage.ImageUrl)
                 .IsRequired()
                 .HasMaxLength(500);
 
-            builder.Property(i => i.IsPrimary)
-                .HasDefaultValue(false);
+            entityTypeBuilder.Property(productImage => productImage.IsPrimary)
+                .HasDefaultValue(false)
+                .IsRequired();
 
-            builder.ConfigureAudit();
+            entityTypeBuilder.Property(productImage => productImage.DisplayOrder)
+                .IsRequired();
+
+            entityTypeBuilder.HasOne(productImage => productImage.Product)
+                .WithMany(product => product.Images)
+                .HasForeignKey(productImage => productImage.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entityTypeBuilder.Property(productImage => productImage.CreatedAt)
+                .IsRequired();
+
+            entityTypeBuilder.Property(productImage => productImage.CreatedBy)
+                .IsRequired();
+
+            entityTypeBuilder.Property(productImage => productImage.UpdatedAt)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(productImage => productImage.UpdatedBy)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(productImage => productImage.DeletedAt)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(productImage => productImage.DeletedBy)
+                .IsRequired(false);
         }
     }
-
 }

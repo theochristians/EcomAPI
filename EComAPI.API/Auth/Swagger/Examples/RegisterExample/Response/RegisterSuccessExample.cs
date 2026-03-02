@@ -1,4 +1,4 @@
-﻿using EComAPI.API.Auth.DTOs.Responses;
+﻿using EComAPI.API.Auth.Dtos.Response;
 using EComAPI.API.Common;
 using Swashbuckle.AspNetCore.Filters;
 

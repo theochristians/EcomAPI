@@ -1,30 +1,31 @@
 ﻿using EComAPI.Application.Auth.Interfaces;
 using EComAPI.Domain.Auth.Entities;
-using EComAPI.Infrastructure.Common.Persistence;
+using EComAPI.Infrastructure.Common.Persistence.Context;
 using Microsoft.EntityFrameworkCore;
 
 namespace EComAPI.Infrastructure.Auth.Persistence.Repositories
 {
     public class RoleRepository : IRoleRepository
     {
-        private readonly AppDbContext _context;
+        private readonly AppDbContext _appDbContext;
 
-        public RoleRepository(AppDbContext context)
+        public RoleRepository(AppDbContext appDbContext)
         {
-            _context = context;
+            _appDbContext = appDbContext;
         }
 
-        public async Task<Role?> GetByNameAsync(string name)
+        public async Task<Role?> GetRoleByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            return await _context.Roles
-                .FirstOrDefaultAsync(x => x.Name == name);
+            return await _appDbContext.Roles
+                .AsNoTracking()
+                .FirstOrDefaultAsync(role => role.Id == id, cancellationToken);
         }
 
-        public async Task<Role?> GetByIdAsync(Guid id)
+        public async Task<Role?> GetRoleByNameAsync(string name, CancellationToken cancellationToken = default)
         {
-            return await _context.Roles
-                .FirstOrDefaultAsync(r => r.Id == id);
+            return await _appDbContext.Roles
+                .AsNoTracking()
+                .FirstOrDefaultAsync(role => role.Name == name, cancellationToken);
         }
-
     }
 }

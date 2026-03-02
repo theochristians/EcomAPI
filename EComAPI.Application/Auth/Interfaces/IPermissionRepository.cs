@@ -4,10 +4,17 @@ namespace EComAPI.Application.Auth.Interfaces
 {
     public interface IPermissionRepository
     {
-        Task<Permission?> GetByIdAsync(Guid id);
-        Task<Permission?> GetByNameAsync(string name);
-        Task<List<Permission>> GetByRoleIdAsync(Guid roleId);
-        Task AddAsync(Permission permission);
-        Task<IReadOnlyList<Permission>> GetByUserIdAsync(Guid userId);
+        // =========================
+        // QUERY (READ-ONLY)
+        // =========================
+        Task<Permission?> GetPermissionByIdAsync(Guid id, CancellationToken cancellationToken = default);
+        Task<Permission?> GetPermissionByNameAsync(string name, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<Permission>> GetPermissionByRoleIdAsync(Guid roleId, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<Permission>> GetPermissionByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
+
+        // =========================
+        // COMMAND (WRITE/PERSISTENCE)
+        // =========================
+        Task AddPermissionAsync(Permission permission, CancellationToken cancellationToken = default);
     }
 }

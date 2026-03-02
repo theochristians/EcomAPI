@@ -1,67 +1,71 @@
 ﻿using EComAPI.Application.Auth.Interfaces;
 using EComAPI.Domain.Auth.Entities;
-using EComAPI.Infrastructure.Common.Persistence;
+using EComAPI.Infrastructure.Common.Persistence.Context;
 using Microsoft.EntityFrameworkCore;
 
 namespace EComAPI.Infrastructure.Auth.Persistence.Repositories
 {
     public class PermissionRepository : IPermissionRepository
     {
-        private readonly AppDbContext _context;
+        private readonly AppDbContext _appDbContext;
 
-        public PermissionRepository(AppDbContext context)
+        public PermissionRepository(AppDbContext appDbContext)
         {
-            _context = context;
+            _appDbContext = appDbContext;
         }
 
-        public async Task<Permission?> GetByIdAsync(Guid id)
+        public async Task<Permission?> GetPermissionByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            return await _context.Permissions
-                .FirstOrDefaultAsync(p => p.Id == id);
+            return await _appDbContext.Permissions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(permission => permission.Id == id, cancellationToken);
         }
 
-        public async Task<Permission?> GetByNameAsync(string name)
+        public async Task<Permission?> GetPermissionByNameAsync(string name, CancellationToken cancellationToken = default)
         {
-            return await _context.Permissions
-                .FirstOrDefaultAsync(p => p.Name == name);
+            return await _appDbContext.Permissions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(permission => permission.Name == name, cancellationToken);
         }
 
-        public async Task<List<Permission>> GetByRoleIdAsync(Guid roleId)
+        public async Task<IReadOnlyList<Permission>> GetPermissionByRoleIdAsync(Guid roleId, CancellationToken cancellationToken = default)
         {
-            return await _context.RolePermissions
-                .Where(rp => rp.RoleId == roleId)
+            return await _appDbContext.RolePermissions
+                .Where(rolePermission => rolePermission.RoleId == roleId)
                 .Join(
-                    _context.Permissions,
-                    rp => rp.PermissionId,
-                    p => p.Id,
-                    (_, p) => p
+                    _appDbContext.Permissions,
+                    rolePermission => rolePermission.PermissionId,
+                    permission => permission.Id,
+                    (_, permission) => permission
                 )
-                .ToListAsync();
+                .AsNoTracking()
+                .ToListAsync(cancellationToken);
         }
 
-        public async Task AddAsync(Permission permission)
+        public async Task<IReadOnlyList<Permission>> GetPermissionByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
         {
-            _context.Permissions.Add(permission);
-            await _context.SaveChangesAsync();
-        }
-        public async Task<IReadOnlyList<Permission>> GetByUserIdAsync(Guid userId)
-        {
-            return await _context.Users
-                .Where(u => u.Id == userId)
+            return await _appDbContext.Users
+                .Where(user => user.Id == userId)
                 .Join(
-                    _context.RolePermissions,
-                    u => u.RoleId,
-                    rp => rp.RoleId,
-                    (_, rp) => rp.PermissionId
+                    _appDbContext.RolePermissions,
+                    user => user.RoleId,
+                    rolePermission => rolePermission.RoleId,
+                    (_, rolePermission) => rolePermission.PermissionId
                 )
                 .Join(
-                    _context.Permissions,
-                    pid => pid,
-                    p => p.Id,
-                    (_, p) => p
+                    _appDbContext.Permissions,
+                    permissionId => permissionId,
+                    permission => permission.Id,
+                    (_, permission) => permission
                 )
-                .Where(p => p.IsActive)
-                .ToListAsync();
+                .Where(permission => permission.IsActive)
+                .AsNoTracking()
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task AddPermissionAsync(Permission permission, CancellationToken cancellationToken = default)
+        {
+            await _appDbContext.Permissions.AddAsync(permission, cancellationToken);
         }
     }
 }

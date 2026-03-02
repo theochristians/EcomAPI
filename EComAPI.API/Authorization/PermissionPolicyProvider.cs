@@ -5,34 +5,36 @@ namespace EComAPI.API.Authorization
 {
     public class PermissionPolicyProvider : IAuthorizationPolicyProvider
     {
-        private const string PREFIX = "PERMISSION:";
-        private readonly DefaultAuthorizationPolicyProvider _fallback;
+        private readonly DefaultAuthorizationPolicyProvider _fallbackPolicyProvider;
 
         public PermissionPolicyProvider(IOptions<AuthorizationOptions> options)
         {
-            _fallback = new DefaultAuthorizationPolicyProvider(options);
+            _fallbackPolicyProvider = new DefaultAuthorizationPolicyProvider(options);
         }
 
         public Task<AuthorizationPolicy> GetDefaultPolicyAsync()
-            => _fallback.GetDefaultPolicyAsync();
+        {
+            return _fallbackPolicyProvider.GetDefaultPolicyAsync();
+        }
 
         public Task<AuthorizationPolicy?> GetFallbackPolicyAsync()
-            => _fallback.GetFallbackPolicyAsync();
+        {
+            return _fallbackPolicyProvider.GetFallbackPolicyAsync();
+        }
 
         public Task<AuthorizationPolicy?> GetPolicyAsync(string policyName)
         {
-            if (policyName.StartsWith(PREFIX))
+            if (policyName.StartsWith("HasPermission:", StringComparison.OrdinalIgnoreCase))
             {
-                var permission = policyName.Substring(PREFIX.Length);
+                var permission = policyName.Substring("HasPermission:".Length);
 
-                var policy = new AuthorizationPolicyBuilder()
-                    .AddRequirements(new PermissionRequirement(permission))
-                    .Build();
+                var policy = new AuthorizationPolicyBuilder();
+                policy.AddRequirements(new PermissionRequirement(permission));
 
-                return Task.FromResult<AuthorizationPolicy?>(policy);
+                return Task.FromResult<AuthorizationPolicy?>(policy.Build());
             }
 
-            return _fallback.GetPolicyAsync(policyName);
+            return _fallbackPolicyProvider.GetPolicyAsync(policyName);
         }
     }
 }

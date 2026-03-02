@@ -4,6 +4,10 @@ namespace EComAPI.Application.Auth.Interfaces
 {
     public interface IJwtTokenGenerator
     {
-        string GenerateToken(User user);
+        // =========================
+        // SECURITY SERVICE
+        // Bukan repository. Tugasnya generate token dari user.
+        // =========================
+        Task<string> GenerateTokenAsync(User user);
     }
 }

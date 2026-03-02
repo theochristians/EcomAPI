@@ -6,17 +6,46 @@ namespace EComAPI.Infrastructure.Auth.Persistence.Configurations
 {
     public class RoleConfiguration : IEntityTypeConfiguration<Role>
     {
-        public void Configure(EntityTypeBuilder<Role> builder)
+        public void Configure(EntityTypeBuilder<Role> entityTypeBuilder)
         {
-            builder.ToTable("Roles");
+            entityTypeBuilder.ToTable("Roles");
 
-            builder.HasKey(x => x.Id);
+            entityTypeBuilder.HasKey(role => role.Id);
 
-            builder.Property(x => x.Name)
+            entityTypeBuilder.Property(role => role.Name)
                 .IsRequired()
                 .HasMaxLength(100);
 
-            builder.HasIndex(x => x.Name).IsUnique();
+            entityTypeBuilder.HasIndex(role => role.Name)
+                .IsUnique();
+
+            entityTypeBuilder.HasMany(role => role.Users)
+                .WithOne(user => user.Role)
+                .HasForeignKey(user => user.RoleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entityTypeBuilder.HasMany(role => role.RolePermissions)
+                .WithOne(rolePermission => rolePermission.Role)
+                .HasForeignKey(rolePermission => rolePermission.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entityTypeBuilder.Property(role => role.CreatedAt)
+                .IsRequired();
+
+            entityTypeBuilder.Property(role => role.CreatedBy)
+                .IsRequired();
+
+            entityTypeBuilder.Property(role => role.UpdatedAt)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(role => role.UpdatedBy)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(role => role.DeletedAt)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(role => role.DeletedBy)
+                .IsRequired(false);
         }
     }
 }

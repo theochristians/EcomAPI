@@ -6,16 +6,48 @@ namespace EComAPI.Infrastructure.Auth.Persistence.Configurations
 {
     public class RolePermissionConfiguration : IEntityTypeConfiguration<RolePermission>
     {
-        public void Configure(EntityTypeBuilder<RolePermission> builder)
+        public void Configure(EntityTypeBuilder<RolePermission> entityTypeBuilder)
         {
-            builder.ToTable("RolePermissions");
+            entityTypeBuilder.ToTable("RolePermissions");
 
-            builder.HasKey(x => x.Id);
+            entityTypeBuilder.HasKey(rolePermission => rolePermission.Id);
 
-            builder.Property(x => x.RoleId).IsRequired();
-            builder.Property(x => x.PermissionId).IsRequired();
+            entityTypeBuilder.Property(rolePermission => rolePermission.RoleId)
+                .IsRequired();
 
-            builder.HasIndex(x => new { x.RoleId, x.PermissionId }).IsUnique();
+            entityTypeBuilder.Property(rolePermission => rolePermission.PermissionId)
+                .IsRequired();
+
+            entityTypeBuilder.HasIndex(rolePermission => new { rolePermission.RoleId, rolePermission.PermissionId })
+                .IsUnique();
+
+            entityTypeBuilder.HasOne(rolePermission => rolePermission.Role)
+                .WithMany(role => role.RolePermissions)
+                .HasForeignKey(rolePermission => rolePermission.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entityTypeBuilder.HasOne(rolePermission => rolePermission.Permission)
+                .WithMany(permission => permission.RolePermissions)
+                .HasForeignKey(rolePermission => rolePermission.PermissionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entityTypeBuilder.Property(rolePermission => rolePermission.CreatedAt)
+                .IsRequired();
+
+            entityTypeBuilder.Property(rolePermission => rolePermission.CreatedBy)
+                .IsRequired();
+
+            entityTypeBuilder.Property(rolePermission => rolePermission.UpdatedAt)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(rolePermission => rolePermission.UpdatedBy)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(rolePermission => rolePermission.DeletedAt)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(rolePermission => rolePermission.DeletedBy)
+                .IsRequired(false);
         }
     }
 }

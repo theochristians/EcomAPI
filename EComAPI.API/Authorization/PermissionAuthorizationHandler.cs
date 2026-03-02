@@ -1,33 +1,38 @@
-﻿using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
-using EComAPI.Application.Auth.Interfaces;
+﻿using Microsoft.AspNetCore.Authorization;
 
 namespace EComAPI.API.Authorization
 {
-    public class PermissionAuthorizationHandler
-        : AuthorizationHandler<PermissionRequirement>
+    public class PermissionAuthorizationHandler : AuthorizationHandler<PermissionRequirement>
     {
-        private readonly IPermissionService _permissionService;
+        private readonly ILogger<PermissionAuthorizationHandler> _logger;
 
-        public PermissionAuthorizationHandler(IPermissionService permissionService)
+        public PermissionAuthorizationHandler(ILogger<PermissionAuthorizationHandler> logger)
         {
-            _permissionService = permissionService;
+            _logger = logger;
         }
 
-        protected override async Task HandleRequirementAsync(
+        protected override Task HandleRequirementAsync(
             AuthorizationHandlerContext context,
             PermissionRequirement requirement)
         {
-            var userIdClaim = context.User.FindFirst(ClaimTypes.NameIdentifier)
-                              ?? context.User.FindFirst("sub");
+            var permissionClaims = context.User.Claims
+                .Where(c => c.Type == "permission")
+                .Select(c => c.Value)
+                .ToHashSet();
 
-            if (userIdClaim == null)
-                return;
-
-            var userId = Guid.Parse(userIdClaim.Value);
-
-            if (await _permissionService.HasPermissionAsync(userId, requirement.Permission))
+            if (permissionClaims.Contains(requirement.Permission))
+            {
                 context.Succeed(requirement);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Permission denied. Required: '{Permission}'. User: {UserId}",
+                    requirement.Permission,
+                    context.User.Identity?.Name ?? "anonymous");
+            }
+
+            return Task.CompletedTask;
         }
     }
 }

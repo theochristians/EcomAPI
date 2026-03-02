@@ -1,5 +1,4 @@
 ﻿using EComAPI.Domain.Auth.Entities;
-using EComAPI.Infrastructure.Common.Persistence.Configurations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -7,38 +6,82 @@ namespace EComAPI.Infrastructure.Auth.Persistence.Configurations
 {
     public class UserConfiguration : IEntityTypeConfiguration<User>
     {
-        public void Configure(EntityTypeBuilder<User> builder)
+        public void Configure(EntityTypeBuilder<User> entityTypeBuilder)
         {
-            builder.ToTable("Users");
+            entityTypeBuilder.ToTable("Users");
 
-            builder.HasKey(x => x.Id);
+            entityTypeBuilder.HasKey(user => user.Id);
 
-            builder.Property(x => x.FullName)
+            entityTypeBuilder.Property(user => user.FullName)
                 .IsRequired()
                 .HasMaxLength(200);
 
-            builder.OwnsOne(x => x.Email, email =>
+            entityTypeBuilder.OwnsOne(user => user.Email, email =>
             {
-                email.Property(e => e.Value)
+                email.Property(emailAddress => emailAddress.Value)
                     .HasColumnName("Email")
                     .IsRequired()
                     .HasMaxLength(255);
 
-                email.HasIndex(e => e.Value).IsUnique();
+                email.HasIndex(emailAddress => emailAddress.Value)
+                    .IsUnique();
             });
 
-            builder.OwnsOne(x => x.Password, pwd =>
+            entityTypeBuilder.OwnsOne(user => user.Password, password =>
             {
-                pwd.Property(p => p.Value)
+                password.Property(passwordHash => passwordHash.Value)
                     .HasColumnName("PasswordHash")
                     .IsRequired();
             });
 
-            builder.Property(x => x.RoleId).IsRequired();
-            builder.Property(x => x.IsActive).IsRequired();
-            builder.Property(x => x.IsEmailVerified).IsRequired();
+            entityTypeBuilder.Property(user => user.RoleId)
+                .IsRequired();
 
-            builder.ConfigureAudit();
+            entityTypeBuilder.Property(user => user.IsActive)
+                .IsRequired();
+
+            entityTypeBuilder.Property(user => user.IsEmailVerified)
+                .IsRequired();
+
+            entityTypeBuilder.Property(user => user.Phone)
+                .IsRequired(false)
+                .HasMaxLength(20);
+
+            entityTypeBuilder.Property(user => user.Avatar)
+                .IsRequired(false)
+                .HasMaxLength(500);
+
+            entityTypeBuilder.Property(user => user.DateOfBirth)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(user => user.Gender)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(user => user.LastLoginAt)
+                .IsRequired(false);
+
+            entityTypeBuilder.HasOne(user => user.Role)
+                .WithMany(role => role.Users)
+                .HasForeignKey(user => user.RoleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entityTypeBuilder.Property(user => user.CreatedAt)
+                .IsRequired();
+
+            entityTypeBuilder.Property(user => user.CreatedBy)
+                .IsRequired();
+
+            entityTypeBuilder.Property(user => user.UpdatedAt)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(user => user.UpdatedBy)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(user => user.DeletedAt)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(user => user.DeletedBy)
+                .IsRequired(false);
         }
     }
 }

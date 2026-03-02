@@ -2,7 +2,7 @@
 {
     public record AddProductImageRequest(
         string ImageUrl,
-        bool IsPrimary,
-        int DisplayOrder
+        bool IsPrimary = false,
+        int DisplayOrder = 0
     );
 }

@@ -3,8 +3,8 @@
     public record AddProductVariantRequest(
         string Sku,
         int Stock,
-        decimal PriceAdjustment,
-        string? Size,
-        string? Color
+        decimal PriceAdjustment = 0,
+        string? Size = null,
+        string? Color = null
     );
 }

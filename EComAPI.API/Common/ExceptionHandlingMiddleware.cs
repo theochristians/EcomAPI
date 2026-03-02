@@ -1,9 +1,8 @@
 ﻿using System.Net;
 using System.Text.Json;
-using EComAPI.API.Common;
 using EComAPI.Domain.Common.Exceptions;
 
-namespace EComAPI.API.Common.Middlewares
+namespace EComAPI.API.Common
 {
     public class ExceptionHandlingMiddleware
     {
@@ -24,14 +23,14 @@ namespace EComAPI.API.Common.Middlewares
             {
                 await _nextRequestDelegate(httpContext);
             }
-            catch (DomainException ex)
+            catch (DomainException domainException)
             {
-                _logger.LogWarning(ex, "Domain exception");
+                _logger.LogWarning(domainException, "Domain exception");
 
                 await WriteResponse(
                     httpContext,
                     HttpStatusCode.BadRequest,
-                    ex.Message
+                    domainException.Message
                 );
             }
             catch (Exception ex)

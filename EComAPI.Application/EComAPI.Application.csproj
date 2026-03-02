@@ -7,20 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Results\**" />
-    <Compile Remove="UseCases\**" />
-    <EmbeddedResource Remove="Results\**" />
-    <EmbeddedResource Remove="UseCases\**" />
-    <None Remove="Results\**" />
-    <None Remove="UseCases\**" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\EComAPI.Domain\EComAPI.Domain.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="MediatR" Version="12.4.1" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
+    <ProjectReference Include="..\EComAPI.Domain\EComAPI.Domain.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,47 +1,82 @@
-﻿using EComAPI.Domain.Categories.Entities;
-using EComAPI.Domain.Product.Entities;
-using EComAPI.Infrastructure.Common.Persistence.Configurations;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using EComAPI.Domain.Products.Entities;
 
 namespace EComAPI.Infrastructure.Products.Persistence.Configurations
 {
     public class ProductConfiguration : IEntityTypeConfiguration<Product>
     {
-        public void Configure(EntityTypeBuilder<Product> builder)
+        public void Configure(EntityTypeBuilder<Product> entityTypeBuilder)
         {
-            builder.ToTable("Products");
+            entityTypeBuilder.ToTable("Products");
 
-            builder.HasKey(p => p.Id);
+            entityTypeBuilder.HasKey(product => product.Id);
 
-            builder.Property(p => p.Name)
+            entityTypeBuilder.Property(product => product.CategoryId)
+                .IsRequired();
+
+            entityTypeBuilder.Property(product => product.Name)
                 .IsRequired()
                 .HasMaxLength(255);
 
-            builder.Property(p => p.Slug)
+            entityTypeBuilder.Property(product => product.Slug)
                 .IsRequired()
                 .HasMaxLength(300);
 
-            builder.HasIndex(p => p.Slug).IsUnique();
+            entityTypeBuilder.HasIndex(product => product.Slug)
+                .IsUnique();
 
-            builder.Property(p => p.BasePrice)
-                .HasColumnType("decimal(18,2)");
+            entityTypeBuilder.Property(product => product.Description)
+                .IsRequired(false);
 
-            builder.Property(p => p.ViewCount)
+            entityTypeBuilder.Property(product => product.BasePrice)
+                .HasColumnType("decimal(18,2)")
+                .IsRequired();
+
+            entityTypeBuilder.Property(product => product.ViewCount)
+                .HasDefaultValue(0)
+                .IsRequired();
+
+            entityTypeBuilder.Property(product => product.TotalStock)
+                .IsRequired()
                 .HasDefaultValue(0);
 
-            builder.Property(p => p.IsActive)
-                .HasDefaultValue(true);
+            entityTypeBuilder.Property(product => product.IsActive)
+                .HasDefaultValue(true)
+                .IsRequired();
 
-            builder.ConfigureAudit();
+            entityTypeBuilder.HasOne<Domain.Categories.Entities.Category>()
+                .WithMany()
+                .HasForeignKey(product => product.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
 
-            builder.HasMany(p => p.Variants)
-                .WithOne()
-                .HasForeignKey(v => v.ProductId);
+            entityTypeBuilder.HasMany(product => product.Variants)
+                .WithOne(productVariant => productVariant.Product)
+                .HasForeignKey(productVariant => productVariant.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
 
-            builder.HasMany(p => p.Images)
-                .WithOne()
-                .HasForeignKey(i => i.ProductId);
+            entityTypeBuilder.HasMany(product => product.Images)
+                .WithOne(productImage => productImage.Product)
+                .HasForeignKey(productImage => productImage.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entityTypeBuilder.Property(product => product.CreatedAt)
+                .IsRequired();
+
+            entityTypeBuilder.Property(product => product.CreatedBy)
+                .IsRequired();
+
+            entityTypeBuilder.Property(product => product.UpdatedAt)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(product => product.UpdatedBy)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(product => product.DeletedAt)
+                .IsRequired(false);
+
+            entityTypeBuilder.Property(product => product.DeletedBy)
+                .IsRequired(false);
         }
     }
 }

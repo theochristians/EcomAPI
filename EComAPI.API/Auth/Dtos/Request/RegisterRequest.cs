@@ -1,4 +1,4 @@
-﻿namespace EComAPI.API.Auth.DTOs.Requests
+﻿namespace EComAPI.API.Auth.Dtos.Request
 {
     public record RegisterRequest(
         string FullName,

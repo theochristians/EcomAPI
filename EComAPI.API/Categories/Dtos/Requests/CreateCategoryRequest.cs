@@ -3,6 +3,8 @@
     public record CreateCategoryRequest(
         string Name,
         string Slug,
-        Guid? ParentId
+        Guid? ParentId,
+        string? ImageUrl,        
+        string? Description      
     );
 }

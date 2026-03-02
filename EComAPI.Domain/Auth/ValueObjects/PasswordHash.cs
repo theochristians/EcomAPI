@@ -1,26 +1,35 @@
-﻿using System.Collections.Generic;
-using EComAPI.Domain.Common.Base;
-using EComAPI.Domain.Common.Exceptions;
+﻿using EComAPI.Domain.Common.Base;
+using EComAPI.Domain.Common.Guards;
 
-public sealed class PasswordHash : ValueObject
+namespace EComAPI.Domain.Auth.ValueObjects
 {
-    public string Value { get; }
-
-    private PasswordHash(string value)
+    public sealed class PasswordHash : ValueObject
     {
-        Value = value;
-    }
+        public string Value { get; }
 
-    public static PasswordHash FromHash(string hash)
-    {
-        if (string.IsNullOrWhiteSpace(hash))
-            throw new DomainException("Password hash cannot be empty");
+        private PasswordHash(string value)
+        {
+            Value = value;
+        }
 
-        return new PasswordHash(hash);
-    }
+        public static PasswordHash FromHash(string hash)
+        {
+            var value = Guard.AgainstNullOrWhiteSpace(hash, "Password hash cannot be empty");
+            Guard.AgainstMaxLength(value, 500, "Password hash cannot exceed 500 characters");
+            return new PasswordHash(value);
+        }
 
-    protected override IEnumerable<object> GetEqualityComponents()
-    {
-        yield return Value;
+        protected override IEnumerable<object> GetEqualityComponents()
+        {
+            yield return Value;
+        }
+
+        public override string ToString() => Value;
+
+        public static implicit operator string(PasswordHash passwordHash)
+        {
+            Guard.AgainstNull(passwordHash, "Password hash is required");
+            return passwordHash.Value;
+        }
     }
 }

@@ -1,7 +1,8 @@
-﻿namespace EComAPI.API.Auth.DTOs.Requests
+﻿namespace EComAPI.API.Auth.Dtos.Request
 {
     public record LoginRequest(
         string Email,
-        string Password
+        string Password,
+        string? DeviceName = null
     );
 }

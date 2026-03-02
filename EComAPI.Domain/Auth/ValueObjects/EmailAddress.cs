@@ -1,12 +1,15 @@
-﻿using System.Collections.Generic;
-using System.Text.RegularExpressions;
-using EComAPI.Domain.Auth.Exceptions;
+﻿using System.Text.RegularExpressions;
 using EComAPI.Domain.Common.Base;
+using EComAPI.Domain.Common.Exceptions;
+using EComAPI.Domain.Common.Guards;
 
 namespace EComAPI.Domain.Auth.ValueObjects
 {
     public sealed class EmailAddress : ValueObject
     {
+        private static readonly Regex EmailRegex =
+            new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         public string Value { get; }
 
         private EmailAddress(string value)
@@ -16,13 +19,13 @@ namespace EComAPI.Domain.Auth.ValueObjects
 
         public static EmailAddress Create(string email)
         {
-            if (string.IsNullOrWhiteSpace(email))
-                throw new InvalidEmailAddressException(email);
+            var value = Guard.AgainstNullOrWhiteSpace(email, "Email address cannot be empty").ToLowerInvariant();
+            Guard.AgainstMaxLength(value, 255, "Email address cannot exceed 255 characters");
 
-            if (!Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
-                throw new InvalidEmailAddressException(email);
+            if (!EmailRegex.IsMatch(value))
+                throw new DomainException($"The email address '{value}' is not valid.");
 
-            return new EmailAddress(email.Trim().ToLowerInvariant());
+            return new EmailAddress(value);
         }
 
         protected override IEnumerable<object> GetEqualityComponents()
@@ -31,5 +34,11 @@ namespace EComAPI.Domain.Auth.ValueObjects
         }
 
         public override string ToString() => Value;
+
+        public static implicit operator string(EmailAddress email)
+        {
+            Guard.AgainstNull(email, "Email address is required");
+            return email.Value;
+        }
     }
 }

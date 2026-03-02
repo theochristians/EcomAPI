@@ -24,7 +24,7 @@ namespace EComAPI.Infrastructure.Auth.Security
             _roleRepository = roleRepository;
         }
 
-        public string GenerateToken(User user)
+        public async Task<string> GenerateTokenAsync(User user)
         {
             // =========================
             // BASE CLAIMS
@@ -39,10 +39,7 @@ namespace EComAPI.Infrastructure.Auth.Security
             // =========================
             // ROLE CLAIM
             // =========================
-            var role = _roleRepository
-                .GetByIdAsync(user.RoleId)
-                .GetAwaiter()
-                .GetResult();
+            var role = await _roleRepository.GetRoleByIdAsync(user.RoleId);
 
             if (role != null)
             {
@@ -52,10 +49,7 @@ namespace EComAPI.Infrastructure.Auth.Security
             // =========================
             // PERMISSION CLAIMS
             // =========================
-            var permissions = _permissionRepository
-                .GetByUserIdAsync(user.Id)
-                .GetAwaiter()
-                .GetResult();
+            var permissions = await _permissionRepository.GetPermissionByUserIdAsync(user.Id);
 
             foreach (var permission in permissions)
             {

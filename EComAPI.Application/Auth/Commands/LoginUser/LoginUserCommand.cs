@@ -2,6 +2,9 @@
 {
     public record LoginUserCommand(
         string Email,
-        string Password
+        string Password,
+        string? IpAddress = null,
+        string? UserAgent = null,
+        string? DeviceName = null
     );
 }
