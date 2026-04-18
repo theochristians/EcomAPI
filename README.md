@@ -221,6 +221,35 @@ dotnet test tests/EComAPI.API.Tests/EComAPI.API.Tests.csproj
 
 Dokumentasi test detail ada di [tests/README.md](tests/README.md).
 
+## CI (Azure DevOps)
+
+Repository ini sekarang punya pipeline YAML di root:
+
+- `azure-pipelines.yml`
+
+Pipeline akan:
+
+- Restore solution `EComAPI.sln`
+- Build solution (`Release`)
+- Menjalankan unit test `EComAPI.Application.Tests` (default)
+- Menjalankan API integration test `EComAPI.API.Tests` hanya jika variable `runApiIntegrationTests=true`
+- Publish test result (`.trx`) dan code coverage (Cobertura)
+
+Langkah setup di Azure DevOps Project Settings / Pipelines:
+
+1. Buka Azure DevOps project yang terhubung ke repo ini.
+2. Masuk ke **Pipelines** -> **New pipeline**.
+3. Pilih source repository ini, lalu pilih **Existing Azure Pipelines YAML file**.
+4. Pilih file `/azure-pipelines.yml` dari branch `TheoDev`.
+5. Klik **Run** untuk verifikasi awal.
+
+Opsional tapi direkomendasikan:
+
+1. Aktifkan **Build Validation** di branch policy (mis. branch `TheoDev` atau `main`) agar PR wajib lolos CI.
+2. Jika nanti test membutuhkan secret runtime tambahan, buat **Library -> Variable groups**, lalu mapping ke pipeline.
+3. Aktifkan permission **Allow scripts to access the OAuth token** hanya jika ada kebutuhan akses API DevOps dari script.
+4. Saat API integration test sudah stabil, set variable pipeline `runApiIntegrationTests=true`.
+
 ## Manual Demo / Smoke Flow
 
 Flow manual end-to-end ada di:

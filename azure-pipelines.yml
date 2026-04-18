@@ -1,0 +1,101 @@
+trigger:
+  branches:
+    include:
+      - TheoDev
+      - main
+
+pr:
+  branches:
+    include:
+      - TheoDev
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  buildConfiguration: Release
+  dotnetSdkVersion: 8.0.x
+  runApiIntegrationTests: 'false'
+
+steps:
+  - checkout: self
+    fetchDepth: 0
+
+  - task: UseDotNet@2
+    displayName: Use .NET SDK $(dotnetSdkVersion)
+    inputs:
+      packageType: sdk
+      version: $(dotnetSdkVersion)
+
+  - script: dotnet --info
+    displayName: Dotnet Info
+
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: EComAPI.sln
+
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: EComAPI.sln
+      arguments: --configuration $(buildConfiguration) --no-restore
+
+  - task: DotNetCoreCLI@2
+    displayName: Test Application Layer
+    inputs:
+      command: test
+      projects: tests/EComAPI.Application.Tests/EComAPI.Application.Tests.csproj
+      publishTestResults: false
+      arguments: --configuration $(buildConfiguration) --no-build --collect:"XPlat Code Coverage" --logger "trx" --results-directory $(Agent.TempDirectory)/TestResults
+    env:
+      ASPNETCORE_ENVIRONMENT: CI
+      ConnectionStrings__SQLServerThrifted: Server=localhost;Database=ThriftedCi;User Id=sa;Password=Passw0rd123!;TrustServerCertificate=True;
+      JwtSettings__Secret: 0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
+      JwtSettings__Issuer: EComAPI-CI
+      JwtSettings__Audience: EComAPI-CI-Client
+      JwtSettings__ExpiryMinutes: 60
+      Redis__Enabled: false
+      Email__Enabled: false
+      AzureBlobStorage__Enabled: false
+
+  - task: DotNetCoreCLI@2
+    displayName: Test API Layer (Optional)
+    condition: and(succeeded(), eq(variables['runApiIntegrationTests'], 'true'))
+    inputs:
+      command: test
+      projects: tests/EComAPI.API.Tests/EComAPI.API.Tests.csproj
+      publishTestResults: false
+      arguments: --configuration $(buildConfiguration) --no-build --collect:"XPlat Code Coverage" --logger "trx" --results-directory $(Agent.TempDirectory)/TestResults
+    env:
+      ASPNETCORE_ENVIRONMENT: CI
+      ConnectionStrings__SQLServerThrifted: Server=localhost;Database=ThriftedCi;User Id=sa;Password=Passw0rd123!;TrustServerCertificate=True;
+      JwtSettings__Secret: 0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
+      JwtSettings__Issuer: EComAPI-CI
+      JwtSettings__Audience: EComAPI-CI-Client
+      JwtSettings__ExpiryMinutes: 60
+      Redis__Enabled: false
+      Email__Enabled: false
+      AzureBlobStorage__Enabled: false
+
+  - task: PublishTestResults@2
+    displayName: Publish Test Results
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: VSTest
+      testResultsFiles: $(Agent.TempDirectory)/TestResults/**/*.trx
+      searchFolder: $(Agent.TempDirectory)/TestResults
+      mergeTestResults: true
+      failTaskOnFailedTests: true
+      testRunTitle: EComAPI Test Results
+
+  - task: PublishCodeCoverageResults@2
+    displayName: Publish Code Coverage
+    condition: succeededOrFailed()
+    inputs:
+      codeCoverageTool: Cobertura
+      summaryFileLocation: $(Agent.TempDirectory)/TestResults/**/coverage.cobertura.xml
+      failIfCoverageEmpty: false
