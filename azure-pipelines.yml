@@ -2,25 +2,27 @@ trigger:
   branches:
     include:
       - TheoDev
-      - main
 
 pr:
   branches:
     include:
       - TheoDev
-      - main
 
 pool:
   vmImage: ubuntu-latest
 
 variables:
-  buildConfiguration: Release
-  dotnetSdkVersion: 8.0.x
-  runApiIntegrationTests: 'false'
+  - group: ThriftedAppAPI-CI-DEV
+  - name: buildConfiguration
+    value: Release
+  - name: dotnetSdkVersion
+    value: 8.0.x
+  - name: runApiIntegrationTests
+    value: 'false'
 
 steps:
   - checkout: self
-    fetchDepth: 0
+    fetchDepth: '0'
 
   - task: UseDotNet@2
     displayName: Use .NET SDK $(dotnetSdkVersion)
@@ -53,14 +55,14 @@ steps:
       arguments: --configuration $(buildConfiguration) --no-build --collect:"XPlat Code Coverage" --logger "trx" --results-directory $(Agent.TempDirectory)/TestResults
     env:
       ASPNETCORE_ENVIRONMENT: CI
-      ConnectionStrings__SQLServerThrifted: Server=localhost;Database=ThriftedCi;User Id=sa;Password=Passw0rd123!;TrustServerCertificate=True;
-      JwtSettings__Secret: 0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
-      JwtSettings__Issuer: EComAPI-CI
-      JwtSettings__Audience: EComAPI-CI-Client
-      JwtSettings__ExpiryMinutes: 60
-      Redis__Enabled: false
-      Email__Enabled: false
-      AzureBlobStorage__Enabled: false
+      ConnectionStrings__SQLServerThrifted: $(ConnectionStrings__SQLServerThrifted)
+      JwtSettings__Secret: $(JwtSettings__Secret)
+      JwtSettings__Issuer: $(JwtSettings__Issuer)
+      JwtSettings__Audience: $(JwtSettings__Audience)
+      JwtSettings__ExpiryMinutes: $(JwtSettings__ExpiryMinutes)
+      Redis__Enabled: $(Redis__Enabled)
+      Email__Enabled: $(Email__Enabled)
+      AzureBlobStorage__Enabled: $(AzureBlobStorage__Enabled)
 
   - task: DotNetCoreCLI@2
     displayName: Test API Layer (Optional)
@@ -72,14 +74,14 @@ steps:
       arguments: --configuration $(buildConfiguration) --no-build --collect:"XPlat Code Coverage" --logger "trx" --results-directory $(Agent.TempDirectory)/TestResults
     env:
       ASPNETCORE_ENVIRONMENT: CI
-      ConnectionStrings__SQLServerThrifted: Server=localhost;Database=ThriftedCi;User Id=sa;Password=Passw0rd123!;TrustServerCertificate=True;
-      JwtSettings__Secret: 0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
-      JwtSettings__Issuer: EComAPI-CI
-      JwtSettings__Audience: EComAPI-CI-Client
-      JwtSettings__ExpiryMinutes: 60
-      Redis__Enabled: false
-      Email__Enabled: false
-      AzureBlobStorage__Enabled: false
+      ConnectionStrings__SQLServerThrifted: $(ConnectionStrings__SQLServerThrifted)
+      JwtSettings__Secret: $(JwtSettings__Secret)
+      JwtSettings__Issuer: $(JwtSettings__Issuer)
+      JwtSettings__Audience: $(JwtSettings__Audience)
+      JwtSettings__ExpiryMinutes: $(JwtSettings__ExpiryMinutes)
+      Redis__Enabled: $(Redis__Enabled)
+      Email__Enabled: $(Email__Enabled)
+      AzureBlobStorage__Enabled: $(AzureBlobStorage__Enabled)
 
   - task: PublishTestResults@2
     displayName: Publish Test Results
@@ -92,7 +94,7 @@ steps:
       failTaskOnFailedTests: true
       testRunTitle: EComAPI Test Results
 
-  - task: PublishCodeCoverageResults@2
+  - task: PublishCodeCoverageResults@1
     displayName: Publish Code Coverage
     condition: succeededOrFailed()
     inputs:
