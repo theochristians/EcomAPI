@@ -229,6 +229,7 @@ Repository ini sekarang punya pipeline YAML di root:
 
 Pipeline akan:
 
+- Menggunakan self-hosted agent pool dari variable `AgentPoolName`.
 - Restore solution `EComAPI.sln`
 - Build solution (`Release`)
 - Menjalankan unit test `EComAPI.Application.Tests` (default)
@@ -246,7 +247,7 @@ Langkah setup di Azure DevOps Project Settings / Pipelines:
 Opsional tapi direkomendasikan:
 
 1. Aktifkan **Build Validation** di branch policy (mis. branch `TheoDev` atau `main`) agar PR wajib lolos CI.
-2. Jika nanti test membutuhkan secret runtime tambahan, buat **Library -> Variable groups**, lalu mapping ke pipeline.
+2. Buat **Library -> Variable groups** lalu mapping ke pipeline, dan pastikan ada variable `AgentPoolName` berisi nama pool self-hosted yang valid.
 3. Aktifkan permission **Allow scripts to access the OAuth token** hanya jika ada kebutuhan akses API DevOps dari script.
 4. Saat API integration test sudah stabil, set variable pipeline `runApiIntegrationTests=true`.
 

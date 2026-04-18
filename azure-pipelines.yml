@@ -9,7 +9,7 @@ pr:
       - TheoDev
 
 pool:
-  vmImage: ubuntu-latest
+  name: Default
 
 variables:
   - group: ThriftedAppAPI-CI-DEV
