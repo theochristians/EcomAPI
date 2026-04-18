@@ -7,6 +7,7 @@ using Xunit;
 using EComAPI.API.Auth.Dtos.Request;
 using EComAPI.API.Auth.Dtos.Response;
 using EComAPI.API.Tests.Infrastructure;
+using EComAPI.Domain.Auth.Enums;
 using EComAPI.Domain.Auth.Entities;
 using EComAPI.Domain.Auth.ValueObjects;
 using EComAPI.Infrastructure.Auth.Security;
@@ -89,6 +90,20 @@ namespace EComAPI.API.Tests.Auth
             verifyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         }
 
+        private static RegisterRequest BuildRegisterRequest(
+            string fullName,
+            string email,
+            string password)
+        {
+            return new RegisterRequest(
+                fullName,
+                email,
+                password,
+                "081234567890",
+                new DateTime(2000, 1, 1),
+                Gender.Male);
+        }
+
         // ─────────────────────────────────────────────────────────
         // POST /api/auth/register
         // ─────────────────────────────────────────────────────────
@@ -98,7 +113,7 @@ namespace EComAPI.API.Tests.Auth
         {
             await EnsureCustomerRoleExists();
 
-            var request = new RegisterRequest("Test User", $"user_{Guid.NewGuid()}@test.com", "Password123!");
+            var request = BuildRegisterRequest("Test User", $"user_{Guid.NewGuid()}@test.com", "Password123!");
 
             var response = await _client.PostAsJsonAsync("/api/auth/register", request);
 
@@ -114,7 +129,7 @@ namespace EComAPI.API.Tests.Auth
         [Fact]
         public async Task Register_EmailKosong_Returns400()
         {
-            var request = new RegisterRequest("Test User", "", "Password123!");
+            var request = BuildRegisterRequest("Test User", "", "Password123!");
 
             var response = await _client.PostAsJsonAsync("/api/auth/register", request);
 
@@ -127,7 +142,7 @@ namespace EComAPI.API.Tests.Auth
         [Fact]
         public async Task Register_PasswordTerlalupendek_Returns400()
         {
-            var request = new RegisterRequest("Test User", "shortpw@test.com", "123");
+            var request = BuildRegisterRequest("Test User", "shortpw@test.com", "123");
 
             var response = await _client.PostAsJsonAsync("/api/auth/register", request);
 
@@ -143,7 +158,7 @@ namespace EComAPI.API.Tests.Auth
             await EnsureCustomerRoleExists();
 
             var email = $"dup_{Guid.NewGuid()}@test.com";
-            var request = new RegisterRequest("Test User", email, "Password123!");
+            var request = BuildRegisterRequest("Test User", email, "Password123!");
 
             // Register pertama - berhasil
             await _client.PostAsJsonAsync("/api/auth/register", request);
@@ -170,7 +185,7 @@ namespace EComAPI.API.Tests.Auth
             // Register user dulu
             var email = $"login_{Guid.NewGuid()}@test.com";
             var password = "Password123!";
-            await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest("Login User", email, password));
+            await _client.PostAsJsonAsync("/api/auth/register", BuildRegisterRequest("Login User", email, password));
             await VerifyEmailByApiAsync(email);
 
             // Login
@@ -192,7 +207,7 @@ namespace EComAPI.API.Tests.Auth
 
             var email = $"unverified_{Guid.NewGuid()}@test.com";
             var password = "Password123!";
-            await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest("Unverified User", email, password));
+            await _client.PostAsJsonAsync("/api/auth/register", BuildRegisterRequest("Unverified User", email, password));
 
             var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, password, null));
 
@@ -209,7 +224,7 @@ namespace EComAPI.API.Tests.Auth
             await EnsureCustomerRoleExists();
 
             var email = $"wrongpw_{Guid.NewGuid()}@test.com";
-            await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest("Wrong PW", email, "Password123!"));
+            await _client.PostAsJsonAsync("/api/auth/register", BuildRegisterRequest("Wrong PW", email, "Password123!"));
             await VerifyEmailByApiAsync(email);
 
             var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, "WrongPassword!", null));
@@ -240,7 +255,7 @@ namespace EComAPI.API.Tests.Auth
 
             // Register + login to obtain a real refresh token
             var email = $"refresh_{Guid.NewGuid()}@test.com";
-            await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest("Refresh User", email, "Password123!"));
+            await _client.PostAsJsonAsync("/api/auth/register", BuildRegisterRequest("Refresh User", email, "Password123!"));
             await VerifyEmailByApiAsync(email);
             var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, "Password123!", null));
             var loginBody = await loginResponse.Content.ReadFromJsonAsync<TestApiResponse<LoginResponse>>(_json);
@@ -290,7 +305,7 @@ namespace EComAPI.API.Tests.Auth
             await EnsureCustomerRoleExists();
 
             var email = $"logout_{Guid.NewGuid()}@test.com";
-            await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest("Logout User", email, "Password123!"));
+            await _client.PostAsJsonAsync("/api/auth/register", BuildRegisterRequest("Logout User", email, "Password123!"));
             await VerifyEmailByApiAsync(email);
             var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, "Password123!", null));
             var loginBody = await loginResponse.Content.ReadFromJsonAsync<TestApiResponse<LoginResponse>>(_json);

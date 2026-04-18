@@ -7,6 +7,7 @@ using Xunit;
 using EComAPI.API.Auth.Dtos.Request;
 using EComAPI.API.Auth.Dtos.Response;
 using EComAPI.API.Tests.Infrastructure;
+using EComAPI.Domain.Auth.Enums;
 using EComAPI.Domain.Auth.Entities;
 using EComAPI.Domain.Auth.ValueObjects;
 using EComAPI.Infrastructure.Common.Persistence.Context;
@@ -47,6 +48,20 @@ namespace EComAPI.API.Tests.Auth
             }
         }
 
+        private static RegisterRequest BuildRegisterRequest(
+            string fullName,
+            string email,
+            string password)
+        {
+            return new RegisterRequest(
+                fullName,
+                email,
+                password,
+                "081234567890",
+                new DateTime(2000, 1, 1),
+                Gender.Male);
+        }
+
         /// <summary>
         /// Register + login a fresh user, return their access token.
         /// </summary>
@@ -55,7 +70,7 @@ namespace EComAPI.API.Tests.Auth
             await EnsureCustomerRoleExists();
 
             email ??= $"usr_{Guid.NewGuid()}@test.com";
-            await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest("Test User", email, password));
+            await _client.PostAsJsonAsync("/api/auth/register", BuildRegisterRequest("Test User", email, password));
 
             var sendResp = await _client.PostAsJsonAsync(
                 "/api/auth/email-verification/send",
@@ -118,6 +133,7 @@ namespace EComAPI.API.Tests.Auth
             var body = await response.Content.ReadFromJsonAsync<TestApiResponse<UserProfileResponse>>(_json);
             body!.Success.Should().BeTrue();
             body.Data!.Email.Should().NotBeNullOrWhiteSpace();
+            body.Data.LastLoginAt.Should().NotBeNull();
         }
 
         // ─────────────────────────────────────────────────────────

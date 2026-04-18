@@ -74,9 +74,12 @@ namespace EComAPI.Infrastructure.Auth.Security
             string htmlBody,
             CancellationToken cancellationToken)
         {
+          var fromAddress = new MailAddress(_emailOptions.FromEmail, _emailOptions.FromName);
+
             using var message = new MailMessage
             {
-                From = new MailAddress(_emailOptions.FromEmail, _emailOptions.FromName),
+            From = fromAddress,
+            Sender = fromAddress,
                 Subject = subject,
                 Body = htmlBody,
                 IsBodyHtml = true,

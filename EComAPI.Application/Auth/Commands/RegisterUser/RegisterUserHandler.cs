@@ -58,6 +58,15 @@ namespace EComAPI.Application.Auth.Commands.RegisterUser
                 if (string.IsNullOrWhiteSpace(registerUserCommand.FullName))
                     return Result<RegisteredUserDto>.Failure("Full name is required");
 
+                if (string.IsNullOrWhiteSpace(registerUserCommand.Phone))
+                    return Result<RegisteredUserDto>.Failure("Phone is required");
+
+                if (registerUserCommand.DateOfBirth == default)
+                    return Result<RegisteredUserDto>.Failure("Date of birth is required");
+
+                if (!Enum.IsDefined(registerUserCommand.Gender) || registerUserCommand.Gender == 0)
+                    return Result<RegisteredUserDto>.Failure("Gender is required");
+
                 var role = await _roleRepository.GetRoleByNameAsync("Customer", cancellationToken);
                 if (role is null)
                     return Result<RegisteredUserDto>.Failure("Default role not found");
@@ -77,7 +86,9 @@ namespace EComAPI.Application.Auth.Commands.RegisterUser
                     password,
                     role.Id,
                     SystemUsers.SystemUserId,
-                    registerUserCommand.Phone
+                    registerUserCommand.Phone,
+                    registerUserCommand.DateOfBirth,
+                    registerUserCommand.Gender
                 );
 
                 await _userRepository.AddUserAsync(user, cancellationToken);

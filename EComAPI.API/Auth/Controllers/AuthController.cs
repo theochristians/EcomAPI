@@ -120,7 +120,10 @@ namespace EComAPI.API.Auth.Controllers
             var registerUserCommand = new RegisterUserCommand(
                 registerRequest.FullName,
                 registerRequest.Email,
-                registerRequest.Password
+                registerRequest.Password,
+                registerRequest.Phone,
+                registerRequest.DateOfBirth,
+                registerRequest.Gender
             );
 
             // Step 2: Eksekusi business logic registrasi di handler.

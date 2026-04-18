@@ -164,12 +164,16 @@ namespace EComAPI.Application.Tests.Auth.Commands.LoginUser
             loginUserResult.Value.Should().NotBeNull();
             loginUserResult.Value!.AccessToken.Should().Be("access_token_value");
             loginUserResult.Value.RefreshToken.Should().NotBeNullOrWhiteSpace();
+            user.LastLoginAt.Should().NotBeNull();
 
             _mockRefreshTokenRepository.Verify(
                 x => x.AddRefreshTokenAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()),
                 Times.Once);
             _mockLoginHistoryRepository.Verify(
                 x => x.AddLoginHistoryAsync(It.IsAny<LoginHistory>(), It.IsAny<CancellationToken>()),
+                Times.Once);
+            _mockUserRepository.Verify(
+                x => x.UpdateUserAsync(user, It.IsAny<CancellationToken>()),
                 Times.Once);
             _mockUnitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         }

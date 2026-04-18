@@ -76,17 +76,14 @@ namespace EComAPI.Application.Auth.Commands.LoginUser
                     loginUserCommand.DeviceName
                 );
 
-                var loginHistory = new Domain.Auth.Entities.LoginHistory(
-                    userByEmail.Id,
-                    "Success",
-                    userByEmail.Id,
-                    null,
+                var loginHistory = userByEmail.RecordLogin(
                     loginUserCommand.IpAddress,
                     loginUserCommand.UserAgent,
                     loginUserCommand.DeviceName);
 
                 await _refreshTokenRepository.AddRefreshTokenAsync(refreshToken, cancellationToken);
                 await _loginHistoryRepository.AddLoginHistoryAsync(loginHistory, cancellationToken);
+                await _userRepository.UpdateUserAsync(userByEmail, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
                 return Result<LoginUserDto>.Success(new LoginUserDto(

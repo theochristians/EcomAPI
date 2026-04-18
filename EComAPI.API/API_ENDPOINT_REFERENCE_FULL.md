@@ -417,12 +417,20 @@ Tidak ada body request.
 | `fullName` | `string` | Yes |
 | `email` | `string` | Yes |
 | `password` | `string` | Yes |
+| `phone` | `string` | Yes |
+| `dateOfBirth` | `DateTime` | Yes |
+| `gender` | `Gender` | Yes |
+
+Nilai enum `gender`: `Male`, `Female`, `Other`, `PreferNotToSay`.
 
 ```json
 {
     "fullName":  "string",
     "email":  "string",
-    "password":  "string"
+    "password":  "string",
+    "phone":  "081234567890",
+    "dateOfBirth":  "2000-01-01T00:00:00Z",
+    "gender":  "Male"
 }
 ```
 

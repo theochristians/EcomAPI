@@ -71,7 +71,7 @@ Project API sudah diaktifkan `UserSecretsId` agar bisa langsung pakai user-secre
 Contoh set local secret:
 
 ```powershell
-dotnet user-secrets --project EComAPI.API set "ConnectionStrings:SQLServerECom" "Server=.;Database=EComDb;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=True;"
+dotnet user-secrets --project EComAPI.API set "ConnectionStrings:SQLServerThrifted" "Server=.;Database=ThriftedDb;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=True;"
 dotnet user-secrets --project EComAPI.API set "JwtSettings:Secret" "<JWT_SECRET>"
 dotnet user-secrets --project EComAPI.API set "AzureBlobStorage:Enabled" "true"
 dotnet user-secrets --project EComAPI.API set "AzureBlobStorage:AccountName" "<STORAGE_ACCOUNT>"
@@ -84,7 +84,7 @@ dotnet user-secrets --project EComAPI.API set "AzureBlobStorage:ClientSecret" "<
 Contoh set environment variable (PowerShell):
 
 ```powershell
-$env:ConnectionStrings__SQLServerECom = "<CONNECTION_STRING>"
+$env:ConnectionStrings__SQLServerThrifted = "<CONNECTION_STRING>"
 $env:JwtSettings__Secret = "<JWT_SECRET>"
 $env:AzureBlobStorage__Enabled = "true"
 $env:AzureBlobStorage__AccountName = "<STORAGE_ACCOUNT>"
@@ -100,7 +100,11 @@ Template key lengkap tersedia di:
 
 ### Database
 
-- Connection string key: `ConnectionStrings:SQLServerECom`
+- Connection string key: `ConnectionStrings:SQLServerThrifted`
+
+Catatan design-time EF:
+`AppDbContextFactory` saat ini membaca connection string dari
+`EComAPI.API/appsettings.json` (key `ConnectionStrings:SQLServerThrifted`).
 
 ### JWT
 
@@ -114,6 +118,24 @@ Template key lengkap tersedia di:
 - `TokenBlacklist:FallbackMinutes`
 - `TokenBlacklist:MaxMinutes`
 - `TokenBlacklist:CleanupIntervalMinutes`
+
+### Rate Limiting
+
+Section config yang dipakai:
+
+- `RateLimiting:RejectionMessage`
+- `RateLimiting:AuthRegister:PermitLimit`
+- `RateLimiting:AuthRegister:WindowMinutes`
+- `RateLimiting:AuthLogin:PermitLimit`
+- `RateLimiting:AuthLogin:WindowMinutes`
+- `RateLimiting:EmailVerifySend:PermitLimit`
+- `RateLimiting:EmailVerifySend:WindowMinutes`
+- `RateLimiting:EmailVerifyCheck:PermitLimit`
+- `RateLimiting:EmailVerifyCheck:WindowMinutes`
+- `RateLimiting:UploadSas:PermitLimit`
+- `RateLimiting:UploadSas:WindowMinutes`
+- `RateLimiting:UploadConfirm:PermitLimit`
+- `RateLimiting:UploadConfirm:WindowMinutes`
 
 ### Redis (Upstash REST)
 
@@ -180,7 +202,7 @@ Env var yang didukung:
 
 ## Seeder Default
 
-Saat startup, API hanya menjalankan seeder role/permission.
+Saat startup, API menjalankan seeder role, permission, dan SYSTEM user.
 
 ## Testing
 

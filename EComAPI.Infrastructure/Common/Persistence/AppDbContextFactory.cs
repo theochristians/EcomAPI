@@ -10,34 +10,19 @@ namespace EComAPI.Infrastructure.Common.Persistence
     {
         public AppDbContext CreateDbContext(string[] args)
         {
-            var environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
             var basePath = Path.Combine(
                 AppContext.BaseDirectory,
                 "..", "..", "..", "..", "EComAPI.API"
             );
 
-            var configurationBuilder = new ConfigurationBuilder()
+            var configuration = new ConfigurationBuilder()
                 .SetBasePath(basePath)
-                .AddJsonFile("appsettings.json", optional: true);
-
-            if (!string.IsNullOrWhiteSpace(environmentName))
-            {
-                configurationBuilder.AddJsonFile(
-                    $"appsettings.{environmentName}.json",
-                    optional: true);
-            }
-
-            var configuration = configurationBuilder
-                .AddEnvironmentVariables()
+                .AddJsonFile("appsettings.json", optional: false)
                 .Build();
 
-            var connectionString = configuration.GetConnectionString("SQLServerECom")
-                ?? configuration.GetConnectionString("SQLServerThrifted")
-                ?? throw new InvalidOperationException(
-                    "Connection string is missing. Configure ConnectionStrings:SQLServerECom or ConnectionStrings:SQLServerThrifted.");
-
             var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-            optionsBuilder.UseSqlServer(connectionString);
+            optionsBuilder.UseSqlServer(
+                configuration.GetConnectionString("SQLServerThrifted"));
 
             return new AppDbContext(optionsBuilder.Options);
         }

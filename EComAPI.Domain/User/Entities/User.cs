@@ -48,7 +48,9 @@ namespace EComAPI.Domain.Auth.Entities
             PasswordHash password,
             Guid roleId,
             Guid createdBy,
-            string? phone = null)
+            string? phone = null,
+            DateTime? dateOfBirth = null,
+            Gender? gender = null)
         {
             if (string.IsNullOrWhiteSpace(fullName))
                 throw new DomainException("Full name is required");
@@ -77,6 +79,16 @@ namespace EComAPI.Domain.Auth.Entities
                     throw new DomainException("Phone must be between 10-20 characters");
             }
 
+            if (dateOfBirth.HasValue)
+            {
+                if (dateOfBirth.Value > JakartaTime.Now)
+                    throw new DomainException("Date of birth cannot be in the future");
+
+                var age = JakartaTime.Now.Year - dateOfBirth.Value.Year;
+                if (age < 13)
+                    throw new DomainException("User must be at least 13 years old");
+            }
+
             FullName = fullName.Trim();
             Email = email;
             Password = password;
@@ -85,8 +97,8 @@ namespace EComAPI.Domain.Auth.Entities
             IsActive = true;
             IsEmailVerified = false;
             Avatar = null;
-            DateOfBirth = null;
-            Gender = null;
+            DateOfBirth = dateOfBirth;
+            Gender = gender;
             LastLoginAt = null;
 
             SetCreated(createdBy);
@@ -234,7 +246,7 @@ namespace EComAPI.Domain.Auth.Entities
             SetUpdated(updatedBy);
         }
 
-        public void RecordLogin(string? ipAddress = null, string? userAgent = null, string? deviceName = null)
+        public LoginHistory RecordLogin(string? ipAddress = null, string? userAgent = null, string? deviceName = null)
         {
             LastLoginAt = JakartaTime.Now;
 
@@ -248,6 +260,7 @@ namespace EComAPI.Domain.Auth.Entities
                 deviceName);
 
             _loginHistories.Add(loginHistory);
+            return loginHistory;
         }
     }
 }

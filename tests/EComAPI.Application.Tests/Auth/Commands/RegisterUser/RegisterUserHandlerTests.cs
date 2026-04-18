@@ -5,6 +5,7 @@ using EComAPI.Application.Auth.Commands.RegisterUser;
 using EComAPI.Application.Auth.Interfaces;
 using EComAPI.Application.Common.Interfaces;
 using EComAPI.Application.Shopping.Interfaces;
+using EComAPI.Domain.Auth.Enums;
 using EComAPI.Domain.Auth.Entities;
 
 namespace EComAPI.Application.Tests.Auth.Commands.RegisterUser
@@ -41,14 +42,28 @@ namespace EComAPI.Application.Tests.Auth.Commands.RegisterUser
             );
         }
 
+        private static RegisterUserCommand BuildCommand(
+            string fullName = "John Doe",
+            string email = "john@example.com",
+            string password = "password123",
+            string phone = "081234567890",
+            DateTime? dateOfBirth = null,
+            Gender gender = Gender.Male)
+        {
+            return new RegisterUserCommand(
+                FullName: fullName,
+                Email: email,
+                Password: password,
+                Phone: phone,
+                DateOfBirth: dateOfBirth ?? new DateTime(2000, 1, 1),
+                Gender: gender
+            );
+        }
+
         [Fact]
         public async Task Handle_EmailKosong_ShouldReturnFailure()
         {
-            var registerUserCommand = new RegisterUserCommand(
-                FullName: "John Doe",
-                Email: "", 
-                Password: "password123"
-            );
+            var registerUserCommand = BuildCommand(email: "");
 
             var registerUserResult = await _registerUserHandler.Handle(registerUserCommand);
 
@@ -59,11 +74,7 @@ namespace EComAPI.Application.Tests.Auth.Commands.RegisterUser
         [Fact]
         public async Task Handle_PasswordKosong_ShouldReturnFailure()
         {
-            var registerUserCommand = new RegisterUserCommand(
-                FullName: "John Doe",
-                Email: "john@example.com",
-                Password: "" 
-            );
+            var registerUserCommand = BuildCommand(password: "");
 
             var registerUserResult = await _registerUserHandler.Handle(registerUserCommand);
 
@@ -74,11 +85,7 @@ namespace EComAPI.Application.Tests.Auth.Commands.RegisterUser
         [Fact]
         public async Task Handle_PasswordTerlaluPendek_ShouldReturnFailure()
         {
-            var registerUserCommand = new RegisterUserCommand(
-                FullName: "John Doe",
-                Email: "john@example.com", 
-                Password: "123" 
-            );
+            var registerUserCommand = BuildCommand(password: "123");
 
             var registerUserResult = await _registerUserHandler.Handle(registerUserCommand);
 
@@ -89,11 +96,7 @@ namespace EComAPI.Application.Tests.Auth.Commands.RegisterUser
         [Fact] 
         public async Task Handle_FullNameKosong_ShouldReturnFailure()
         {
-            var registerUserCommand = new RegisterUserCommand(
-                FullName: "", 
-                Email: "john@example.com",
-                Password: "password123"
-            );
+            var registerUserCommand = BuildCommand(fullName: "");
 
             var registerUserResult = await _registerUserHandler.Handle(registerUserCommand);
 
@@ -104,11 +107,7 @@ namespace EComAPI.Application.Tests.Auth.Commands.RegisterUser
         [Fact]
         public async Task Handle_RoleNotFound_ShouldReturnFailure()
         {
-            var registerUserCommand = new RegisterUserCommand(
-                FullName: "John Doe",
-                Email: "john@example.com", 
-                Password: "password123"
-            );
+            var registerUserCommand = BuildCommand();
 
             _mockRoleRepository
                 .Setup(x => x.GetRoleByNameAsync("Customer", It.IsAny<CancellationToken>()))
@@ -123,11 +122,7 @@ namespace EComAPI.Application.Tests.Auth.Commands.RegisterUser
         [Fact]
         public async Task Handle_ValidInput_ShouldReturnSuccess()
         {
-            var registerUserCommand = new RegisterUserCommand(
-                FullName: "John Doe",
-                Email: "john@example.com",
-                Password: "password123"
-            );
+            var registerUserCommand = BuildCommand();
 
             var customerRole = new Role("Customer", Guid.NewGuid());
             _mockRoleRepository
@@ -167,11 +162,7 @@ namespace EComAPI.Application.Tests.Auth.Commands.RegisterUser
         [Fact]
         public async Task Handle_EmailSudahTerdaftar_ShouldReturnFailure()
         {
-            var registerUserCommand = new RegisterUserCommand(
-                FullName: "John Doe",
-                Email: "existing@example.com",
-                Password: "password123"
-            );
+            var registerUserCommand = BuildCommand(email: "existing@example.com");
 
             var customerRole = new Role("Customer", Guid.NewGuid());
             _mockRoleRepository
@@ -186,6 +177,53 @@ namespace EComAPI.Application.Tests.Auth.Commands.RegisterUser
 
             registerUserResult.IsSuccess.Should().BeFalse();
             registerUserResult.Error.Should().Be("Email already registered"); // Dari kode actual!
+        }
+
+        [Fact]
+        public async Task Handle_PhoneKosong_ShouldReturnFailure()
+        {
+            var registerUserCommand = BuildCommand(phone: "");
+
+            var registerUserResult = await _registerUserHandler.Handle(registerUserCommand);
+
+            registerUserResult.IsSuccess.Should().BeFalse();
+            registerUserResult.Error.Should().Be("Phone is required");
+        }
+
+        [Fact]
+        public async Task Handle_TanggalLahirKosong_ShouldReturnFailure()
+        {
+            var registerUserCommand = new RegisterUserCommand(
+                FullName: "John Doe",
+                Email: "john@example.com",
+                Password: "password123",
+                Phone: "081234567890",
+                DateOfBirth: default,
+                Gender: Gender.Male
+            );
+
+            var registerUserResult = await _registerUserHandler.Handle(registerUserCommand);
+
+            registerUserResult.IsSuccess.Should().BeFalse();
+            registerUserResult.Error.Should().Be("Date of birth is required");
+        }
+
+        [Fact]
+        public async Task Handle_GenderKosong_ShouldReturnFailure()
+        {
+            var registerUserCommand = new RegisterUserCommand(
+                FullName: "John Doe",
+                Email: "john@example.com",
+                Password: "password123",
+                Phone: "081234567890",
+                DateOfBirth: new DateTime(2000, 1, 1),
+                Gender: 0
+            );
+
+            var registerUserResult = await _registerUserHandler.Handle(registerUserCommand);
+
+            registerUserResult.IsSuccess.Should().BeFalse();
+            registerUserResult.Error.Should().Be("Gender is required");
         }
     }
 }

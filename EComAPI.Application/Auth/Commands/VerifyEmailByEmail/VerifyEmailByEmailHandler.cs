@@ -3,6 +3,7 @@ using EComAPI.Application.Common.Constants;
 using EComAPI.Application.Common.Interfaces;
 using EComAPI.Application.Common.Result;
 using EComAPI.Domain.Common.Exceptions;
+using System.Text;
 
 namespace EComAPI.Application.Auth.Commands.VerifyEmailByEmail
 {
@@ -32,7 +33,7 @@ namespace EComAPI.Application.Auth.Commands.VerifyEmailByEmail
                 if (string.IsNullOrWhiteSpace(email))
                     return Result.Failure("Email is required");
 
-                var code = verifyEmailByEmailCommand.Code?.Trim() ?? string.Empty;
+                var code = NormalizeVerificationCode(verifyEmailByEmailCommand.Code);
                 if (string.IsNullOrWhiteSpace(code))
                     return Result.Failure("Verification code is required");
 
@@ -59,7 +60,7 @@ namespace EComAPI.Application.Auth.Commands.VerifyEmailByEmail
                 if (latestPending.IsMaxAttemptsReached)
                     return Result.Failure("Maximum verification attempts reached. Please request a new code");
 
-                if (!string.Equals(latestPending.Code, code, StringComparison.Ordinal))
+                if (!string.Equals(NormalizeVerificationCode(latestPending.Code), code, StringComparison.OrdinalIgnoreCase))
                 {
                     latestPending.IncrementAttempt(SystemUsers.SystemUserId);
                     await _emailVerificationRepository.UpdateEmailVerificationAsync(latestPending, cancellationToken);
@@ -84,6 +85,21 @@ namespace EComAPI.Application.Auth.Commands.VerifyEmailByEmail
             {
                 return Result.Failure($"Failed to verify email: {exception.Message}");
             }
+        }
+
+        private static string NormalizeVerificationCode(string? rawCode)
+        {
+            if (string.IsNullOrWhiteSpace(rawCode))
+                return string.Empty;
+
+            var builder = new StringBuilder(rawCode.Length);
+            foreach (var character in rawCode)
+            {
+                if (char.IsLetterOrDigit(character))
+                    builder.Append(character);
+            }
+
+            return builder.ToString();
         }
     }
 }
