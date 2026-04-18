@@ -1,5 +1,7 @@
-﻿using EComAPI.Application.Categories.DTOs;
+using EComAPI.Application.Categories.DTOs;
 using EComAPI.Application.Categories.Interfaces;
+using EComAPI.Application.Common.Constants;
+using EComAPI.Application.Common.Interfaces;
 using EComAPI.Application.Common.Result;
 using EComAPI.Domain.Common.Exceptions;
 
@@ -7,11 +9,17 @@ namespace EComAPI.Application.Categories.Queries.GetCategoriesBySlug
 {
     public class GetCategoryBySlugHandler
     {
-        private readonly ICategoryRepository _categoryRepository;
+        private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
 
-        public GetCategoryBySlugHandler(ICategoryRepository categoryRepository)
+        private readonly ICategoryRepository _categoryRepository;
+        private readonly ICacheService _cacheService;
+
+        public GetCategoryBySlugHandler(
+            ICategoryRepository categoryRepository,
+            ICacheService cacheService)
         {
             _categoryRepository = categoryRepository;
+            _cacheService = cacheService;
         }
 
         public async Task<Result<CategoryDto>> Handle(
@@ -23,6 +31,19 @@ namespace EComAPI.Application.Categories.Queries.GetCategoriesBySlug
             {
                 if (string.IsNullOrWhiteSpace(getCategoriesBySlugQuery.Slug))
                     return Result<CategoryDto>.Failure("Slug is required");
+
+                var normalizedSlug = getCategoriesBySlugQuery.Slug.Trim().ToLowerInvariant();
+                var namespaceVersions = await _cacheService.GetNamespaceVersionsAsync(
+                    new[] { CacheKeys.CategoriesNamespace, CacheKeys.ProductsNamespace },
+                    cancellationToken);
+
+                var categoriesVersion = namespaceVersions.GetValueOrDefault(CacheKeys.CategoriesNamespace, 1);
+                var productsVersion = namespaceVersions.GetValueOrDefault(CacheKeys.ProductsNamespace, 1);
+                var cacheKey = $"query:categories:v{categoriesVersion}:pv{productsVersion}:slug:{normalizedSlug}";
+
+                var cachedCategory = await _cacheService.GetAsync<CategoryDto>(cacheKey, cancellationToken);
+                if (cachedCategory != null)
+                    return Result<CategoryDto>.Success(cachedCategory);
 
                 var getCategoryBySlugAsync = await _categoryRepository.GetCategoryBySlugAsync(
                     getCategoriesBySlugQuery.Slug,
@@ -47,6 +68,8 @@ namespace EComAPI.Application.Categories.Queries.GetCategoriesBySlug
                     getCategoryBySlugAsync.CreatedBy,
                     getCategoryBySlugAsync.UpdatedAt,
                     getCategoryBySlugAsync.UpdatedBy);
+
+                await _cacheService.SetAsync(cacheKey, categoriesDTOsResult, CacheTtl, cancellationToken);
 
                 return Result<CategoryDto>.Success(categoriesDTOsResult);
             }

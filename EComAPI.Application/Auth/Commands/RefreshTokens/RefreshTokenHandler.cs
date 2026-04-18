@@ -1,4 +1,4 @@
-﻿using EComAPI.Application.Auth.DTOs;
+using EComAPI.Application.Auth.DTOs;
 using EComAPI.Application.Auth.Interfaces;
 using EComAPI.Application.Common.Interfaces;
 using EComAPI.Application.Common.Interfaces.Identity;
@@ -13,6 +13,7 @@ namespace EComAPI.Application.Auth.Commands.RefreshTokens
     {
         private readonly IRefreshTokenRepository _refreshTokenRepository;
         private readonly ITokenBlacklistRepository _tokenBlacklistRepository;
+        private readonly ITokenBlacklistLifetimeProvider _tokenBlacklistLifetimeProvider;
         private readonly IJwtTokenGenerator _jwtTokenGenerator;
         private readonly ICurrentUser _currentUser;
         private readonly IUnitOfWork _unitOfWork;
@@ -20,12 +21,14 @@ namespace EComAPI.Application.Auth.Commands.RefreshTokens
         public RefreshTokenHandler(
             IRefreshTokenRepository refreshTokenRepository,
             ITokenBlacklistRepository tokenBlacklistRepository,
+            ITokenBlacklistLifetimeProvider tokenBlacklistLifetimeProvider,
             IJwtTokenGenerator jwtTokenGenerator,
             ICurrentUser currentUser,
             IUnitOfWork unitOfWork)
         {
             _refreshTokenRepository = refreshTokenRepository;
             _tokenBlacklistRepository = tokenBlacklistRepository;
+            _tokenBlacklistLifetimeProvider = tokenBlacklistLifetimeProvider;
             _jwtTokenGenerator = jwtTokenGenerator;
             _currentUser = currentUser;
             _unitOfWork = unitOfWork;
@@ -80,11 +83,16 @@ namespace EComAPI.Application.Auth.Commands.RefreshTokens
 
                     if (!isOldAccessTokenBlacklisted)
                     {
+                        var expiresAt = TokenHelper.ResolveAccessTokenExpiry(
+                            refreshTokenCommand.CurrentAccessToken,
+                            _tokenBlacklistLifetimeProvider.FallbackLifetime,
+                            _tokenBlacklistLifetimeProvider.MaxLifetime);
+
                         var tokenBlacklist = new TokenBlacklist(
                             user.Id,
                             oldAccessTokenHash,
                             "Access token rotated",
-                            DateTime.UtcNow.AddMinutes(15),
+                            expiresAt,
                             user.Id
                         );
 
@@ -93,6 +101,7 @@ namespace EComAPI.Application.Auth.Commands.RefreshTokens
                 }
 
                 var newAccessToken = await _jwtTokenGenerator.GenerateTokenAsync(user);
+                var accessTokenExpiresAt = TokenHelper.ResolveAccessTokenExpiry(newAccessToken);
                 var newRefreshTokenString = TokenHelper.GenerateRefreshToken();
                 var newRefreshTokenHash = TokenHelper.HashToken(newRefreshTokenString);
 
@@ -101,7 +110,7 @@ namespace EComAPI.Application.Auth.Commands.RefreshTokens
                 var newRefreshToken = new RefreshToken(
                     user.Id,
                     newRefreshTokenHash,
-                    DateTime.UtcNow.AddDays(7),
+                    SecurityTime.UtcNow.AddDays(7),
                     user.Id,
                     refreshTokenCommand.IpAddress ?? refreshToken.IpAddress,
                     refreshTokenCommand.UserAgent ?? refreshToken.UserAgent,
@@ -114,7 +123,7 @@ namespace EComAPI.Application.Auth.Commands.RefreshTokens
                 return Result<LoginUserDto>.Success(new LoginUserDto(
                     newAccessToken,
                     newRefreshTokenString,
-                    DateTime.UtcNow.AddMinutes(15),
+                    accessTokenExpiresAt,
                     newRefreshToken.ExpiresAt
                 ));
             }

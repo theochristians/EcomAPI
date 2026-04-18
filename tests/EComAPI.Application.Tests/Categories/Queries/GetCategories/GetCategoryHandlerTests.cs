@@ -1,23 +1,37 @@
+using EComAPI.Application.Categories.Interfaces;
+using EComAPI.Application.Categories.Queries.GetCategories;
+using EComAPI.Application.Common.Interfaces;
+using EComAPI.Domain.Categories.Entities;
 using FluentAssertions;
 using Moq;
 using Xunit;
-using EComAPI.Application.Categories.Interfaces;
-using EComAPI.Application.Categories.Queries.GetCategories;
-using EComAPI.Domain.Categories.Entities;
 
 namespace EComAPI.Application.Tests.Categories.Queries.GetCategories
 {
     public class GetCategoryHandlerTests
     {
         private readonly Mock<ICategoryRepository> _mockCategoryRepository;
-        private readonly GetCategoryHandler _getCategoryHandler;
+        private readonly Mock<ICacheService> _mockCacheService;
+        private readonly GetCategoriesHandler _getCategoryHandler;
 
         private readonly Guid _userId = Guid.NewGuid();
 
         public GetCategoryHandlerTests()
         {
             _mockCategoryRepository = new Mock<ICategoryRepository>();
-            _getCategoryHandler = new GetCategoryHandler(_mockCategoryRepository.Object);
+            _mockCacheService = new Mock<ICacheService>();
+
+            _mockCacheService
+                .Setup(x => x.GetNamespaceVersionsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new Dictionary<string, long>
+                {
+                    ["categories"] = 1,
+                    ["products"] = 1
+                });
+
+            _getCategoryHandler = new GetCategoriesHandler(
+                _mockCategoryRepository.Object,
+                _mockCacheService.Object);
         }
 
         [Fact]
@@ -31,7 +45,7 @@ namespace EComAPI.Application.Tests.Categories.Queries.GetCategories
                 .Setup(x => x.GetProductCountsAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new Dictionary<Guid, int>());
 
-            var getCategoryResult = await _getCategoryHandler.Handle();
+            var getCategoryResult = await _getCategoryHandler.Handle(new GetCategoriesQuery(), CancellationToken.None);
 
             getCategoryResult.IsSuccess.Should().BeTrue();
             getCategoryResult.Value.Should().BeEmpty();
@@ -60,7 +74,7 @@ namespace EComAPI.Application.Tests.Categories.Queries.GetCategories
                 .Setup(x => x.GetProductCountsAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(productCounts);
 
-            var getCategoryResult = await _getCategoryHandler.Handle();
+            var getCategoryResult = await _getCategoryHandler.Handle(new GetCategoriesQuery(), CancellationToken.None);
 
             getCategoryResult.IsSuccess.Should().BeTrue();
             getCategoryResult.Value.Should().HaveCount(2);

@@ -28,5 +28,22 @@ namespace EComAPI.Infrastructure.Auth.Security
 
             return Task.CompletedTask;
         }
+
+        public Task SendPasswordResetCodeAsync(
+            string toEmail,
+            string fullName,
+            string code,
+            DateTime expiresAt,
+            CancellationToken cancellationToken = default)
+        {
+            _logger.LogInformation(
+                "Password reset code for {Email} ({FullName}): {Code}. Expires at {ExpiresAtUtc:u}",
+                toEmail,
+                fullName,
+                code,
+                expiresAt);
+
+            return Task.CompletedTask;
+        }
     }
 }

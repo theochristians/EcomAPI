@@ -1,15 +1,19 @@
 ﻿using EComAPI.Domain.Auth.Entities;
+using EComAPI.Domain.Auth.ValueObjects;
 using EComAPI.Infrastructure.Common.Constants;
 using EComAPI.Infrastructure.Common.Persistence.Context;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace EComAPI.Infrastructure.Auth.Persistence.Seeders
 {
     public static class PermissionSeeder
     {
-        public static async Task SeedAsync(AppDbContext appDbContext)
+        public static async Task SeedAsync(
+            AppDbContext appDbContext,
+            IConfiguration configuration)
         {
-            Console.WriteLine("🔑 Seeding Roles and Permissions...");
+            Console.WriteLine("Seeding Roles and Permissions...");
 
             await SeedSystemUserAsync(appDbContext);
 
@@ -58,7 +62,7 @@ namespace EComAPI.Infrastructure.Auth.Persistence.Seeders
             foreach (var (name, category, description) in permissions)
             {
                 var exists = await appDbContext.Permissions
-                    .AnyAsync(p => p.Name == name);
+                    .AnyAsync(permissions => permissions.Name == name);
 
                 if (!exists)
                 {
@@ -72,7 +76,7 @@ namespace EComAPI.Infrastructure.Auth.Persistence.Seeders
 
                     appDbContext.Permissions.Add(permission);
                     permissionEntities.Add(permission);
-                    Console.WriteLine($"   ➕ Added permission: {name}");
+                    Console.WriteLine($"Added permission: {name}");
                 }
                 else
                 {
@@ -84,41 +88,39 @@ namespace EComAPI.Infrastructure.Auth.Persistence.Seeders
             await appDbContext.SaveChangesAsync();
 
             // ===== ASSIGN PERMISSIONS TO ADMIN =====
-            Console.WriteLine("🔑 Assigning permissions to Admin role...");
+            Console.WriteLine("Assigning permissions to Admin role...");
             await AssignPermissionsToRoleAsync(appDbContext, adminRole, permissionEntities);
 
             // ===== ASSIGN PERMISSIONS TO CUSTOMER =====
             var customerPermissions = permissionEntities
-                .Where(p =>
-                    p.Name == "products.read" ||
-                    p.Name == "categories.read" ||
-                    p.Name.Contains("own") ||
-                    p.Name == "orders.create"
+                .Where(permissions =>
+                    permissions.Name == "products.read" ||
+                    permissions.Name == "categories.read" ||
+                    permissions.Name.Contains("own") ||
+                    permissions.Name == "orders.create"
                 )
                 .ToList();
 
-            Console.WriteLine("🔑 Assigning permissions to Customer role...");
+            Console.WriteLine("Assigning permissions to Customer role...");
             await AssignPermissionsToRoleAsync(appDbContext, customerRole, customerPermissions);
 
-            Console.WriteLine("✅ Permission seeding completed!");
+            Console.WriteLine("Permission seeding completed!");
         }
-
         // ===== SEED SYSTEM USER =====
         private static async Task SeedSystemUserAsync(AppDbContext appDbContext)
         {
             var systemUserExists = await appDbContext.Users
                 .IgnoreQueryFilters()
-                .AnyAsync(u => u.Id == SystemUsers.SystemUserId);
+                .AnyAsync(user => user.Id == SystemUsers.SystemUserId);
 
             if (systemUserExists)
             {
-                Console.WriteLine("   ✅ SYSTEM user already exists");
+                Console.WriteLine(" SYSTEM user already exists");
                 return;
             }
 
-            // Create Admin role first if not exists
             var adminRole = await appDbContext.Roles
-                .FirstOrDefaultAsync(r => r.Name == "Admin");
+                .FirstOrDefaultAsync(role => role.Name == "Admin");
 
             if (adminRole == null)
             {
@@ -131,11 +133,11 @@ namespace EComAPI.Infrastructure.Auth.Persistence.Seeders
                 await appDbContext.SaveChangesAsync();
             }
 
-            var systemUser = Domain.Auth.Entities.User.CreateForSeed(
+            var systemUser = User.CreateForSeed(
                 SystemUsers.SystemUserId,
                 SystemUsers.SystemUserName,
-                Domain.Auth.ValueObjects.EmailAddress.Create(SystemUsers.SystemUserEmail),
-                Domain.Auth.ValueObjects.PasswordHash.FromHash("SYSTEM_NOT_USABLE"),
+                EmailAddress.Create(SystemUsers.SystemUserEmail),
+                PasswordHash.FromHash("SYSTEM_NOT_USABLE"),
                 adminRole.Id,
                 SystemUsers.SystemUserId
             );
@@ -143,20 +145,20 @@ namespace EComAPI.Infrastructure.Auth.Persistence.Seeders
             appDbContext.Users.Add(systemUser);
             await appDbContext.SaveChangesAsync();
 
-            Console.WriteLine("   ➕ Created SYSTEM user");
+            Console.WriteLine("Created SYSTEM user");
         }
 
         // ===== GET OR CREATE ROLE =====
         private static async Task<Role> GetOrCreateRoleAsync(
-            AppDbContext context,
+            AppDbContext appDbContext,
             string roleName)
         {
-            var role = await context.Roles
-                .FirstOrDefaultAsync(r => r.Name == roleName);
+            var role = await appDbContext.Roles
+                .FirstOrDefaultAsync(role => role.Name == roleName);
 
             if (role != null)
             {
-                Console.WriteLine($"   ✅ Role '{roleName}' already exists");
+                Console.WriteLine($"Role '{roleName}' already exists");
                 return role;
             }
 
@@ -166,10 +168,10 @@ namespace EComAPI.Infrastructure.Auth.Persistence.Seeders
                 SystemUsers.SystemUserId
             );
 
-            context.Roles.Add(role);
-            await context.SaveChangesAsync();
+            appDbContext.Roles.Add(role);
+            await appDbContext.SaveChangesAsync();
 
-            Console.WriteLine($"   ➕ Created role: {roleName}");
+            Console.WriteLine($"Created role: {roleName}");
             return role;
         }
 
@@ -184,9 +186,9 @@ namespace EComAPI.Infrastructure.Auth.Persistence.Seeders
 
             foreach (var permission in permissions)
             {
-                var exists = await appDbContext.RolePermissions.AnyAsync(rp =>
-                    rp.RoleId == role.Id &&
-                    rp.PermissionId == permission.Id);
+                var exists = await appDbContext.RolePermissions.AnyAsync(rolePermission =>
+                    rolePermission.RoleId == role.Id &&
+                    rolePermission.PermissionId == permission.Id);
 
                 if (!exists)
                 {
@@ -202,7 +204,32 @@ namespace EComAPI.Infrastructure.Auth.Persistence.Seeders
             }
 
             await appDbContext.SaveChangesAsync();
-            Console.WriteLine($"   ✅ Assigned {added} permissions to '{role.Name}' (skipped {skipped} existing)");
+            Console.WriteLine($"Assigned {added} permissions to '{role.Name}' (skipped {skipped} existing)");
+        }
+
+        private static bool? ParseNullableBool(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return null;
+
+            if (bool.TryParse(value, out var parsedBool))
+                return parsedBool;
+
+            if (int.TryParse(value, out var parsedInt))
+                return parsedInt != 0;
+
+            return null;
+        }
+
+        private static string GetFirstNonEmpty(params string?[] values)
+        {
+            foreach (var value in values)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                    return value.Trim();
+            }
+
+            return string.Empty;
         }
     }
 }

@@ -1,11 +1,14 @@
-﻿using EComAPI.Application.Auth.DTOs;
+using EComAPI.Application.Auth.Common;
+using EComAPI.Application.Auth.DTOs;
 using EComAPI.Application.Auth.Interfaces;
 using EComAPI.Application.Common.Constants;
 using EComAPI.Application.Common.Interfaces;
 using EComAPI.Application.Common.Result;
+using EComAPI.Application.Shopping.Interfaces;
 using EComAPI.Domain.Auth.Entities;
 using EComAPI.Domain.Auth.ValueObjects;
 using EComAPI.Domain.Common.Exceptions;
+using EComAPI.Domain.Shopping.Entities;
 
 namespace EComAPI.Application.Auth.Commands.RegisterUser
 {
@@ -14,17 +17,26 @@ namespace EComAPI.Application.Auth.Commands.RegisterUser
         private readonly IUserRepository _userRepository;
         private readonly IRoleRepository _roleRepository;
         private readonly IPasswordHasher _passwordHasher;
+        private readonly ICartRepository _cartRepository;
+        private readonly IEmailVerificationRepository _emailVerificationRepository;
+        private readonly IEmailSender _emailSender;
         private readonly IUnitOfWork _unitOfWork;
 
         public RegisterUserHandler(
             IUserRepository userRepository,
             IRoleRepository roleRepository,
             IPasswordHasher passwordHasher,
+            ICartRepository cartRepository,
+            IEmailVerificationRepository emailVerificationRepository,
+            IEmailSender emailSender,
             IUnitOfWork unitOfWork)
         {
             _userRepository = userRepository;
             _roleRepository = roleRepository;
             _passwordHasher = passwordHasher;
+            _cartRepository = cartRepository;
+            _emailVerificationRepository = emailVerificationRepository;
+            _emailSender = emailSender;
             _unitOfWork = unitOfWork;
         }
 
@@ -70,6 +82,34 @@ namespace EComAPI.Application.Auth.Commands.RegisterUser
 
                 await _userRepository.AddUserAsync(user, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+                var cart = new Cart(user.Id, SystemUsers.SystemUserId);
+                await _cartRepository.AddCartAsync(cart, cancellationToken);
+
+                var verificationCode = OtpCodeGenerator.GenerateSixDigits();
+                var expiresAt = SecurityTime.UtcNow.AddMinutes(10);
+                var emailVerification = new EmailVerification(
+                    user.Id,
+                    verificationCode,
+                    expiresAt,
+                    SystemUsers.SystemUserId);
+                await _emailVerificationRepository.AddEmailVerificationAsync(emailVerification, cancellationToken);
+
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+                try
+                {
+                    await _emailSender.SendEmailVerificationCodeAsync(
+                        user.Email.Value,
+                        user.FullName,
+                        verificationCode,
+                        expiresAt,
+                        cancellationToken);
+                }
+                catch
+                {
+                    // User can request resend OTP later from public endpoint.
+                }
 
                 return Result<RegisteredUserDto>.Success(
                     new RegisteredUserDto(user.Id, user.FullName, user.Email.Value, user.IsEmailVerified));

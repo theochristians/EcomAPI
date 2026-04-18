@@ -8,5 +8,12 @@ namespace EComAPI.Application.Auth.Interfaces
             string code,
             DateTime expiresAt,
             CancellationToken cancellationToken = default);
+
+        Task SendPasswordResetCodeAsync(
+            string toEmail,
+            string fullName,
+            string code,
+            DateTime expiresAt,
+            CancellationToken cancellationToken = default);
     }
 }

@@ -1,23 +1,35 @@
 using EComAPI.Application.Categories.Interfaces;
+using EComAPI.Application.Common.Constants;
+using EComAPI.Application.Common.Interfaces;
 using EComAPI.Application.Common.Result;
 using EComAPI.Application.Products.DTOs;
 using EComAPI.Application.Products.Interfaces;
 using EComAPI.Domain.Categories.Entities;
 using EComAPI.Domain.Common.Exceptions;
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace EComAPI.Application.Products.Queries.GetProducts
 {
     public class GetProductsHandler
     {
+        private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(3);
+
         private readonly IProductRepository _productRepository;
         private readonly ICategoryRepository _categoriesRepository;
+        private readonly ICacheService _cacheService;
+
+        private sealed record ProductsQueryCacheItem(IReadOnlyList<ProductListDto> Items, int TotalCount, int TotalPages);
 
         public GetProductsHandler(
             IProductRepository productRepository,
-            ICategoryRepository categoriesRepository)
+            ICategoryRepository categoriesRepository,
+            ICacheService cacheService)
         {
             _productRepository = productRepository;
             _categoriesRepository = categoriesRepository;
+            _cacheService = cacheService;
         }
 
         public async Task<Result<(IReadOnlyList<ProductListDto> Items, int TotalCount, int TotalPages)>> Handle(
@@ -32,6 +44,21 @@ namespace EComAPI.Application.Products.Queries.GetProducts
                 if (getProductsQuery.PageSize < 1)
                     return Result<(IReadOnlyList<ProductListDto>, int, int)>.Failure("Page size must be greater than 0");
 
+                var namespaceVersions = await _cacheService.GetNamespaceVersionsAsync(
+                    new[] { CacheKeys.CategoriesNamespace, CacheKeys.ProductsNamespace },
+                    cancellationToken);
+
+                var categoriesVersion = namespaceVersions.GetValueOrDefault(CacheKeys.CategoriesNamespace, 1);
+                var productsVersion = namespaceVersions.GetValueOrDefault(CacheKeys.ProductsNamespace, 1);
+                var cacheKey = BuildProductsQueryCacheKey(getProductsQuery, categoriesVersion, productsVersion);
+
+                var cachedResult = await _cacheService.GetAsync<ProductsQueryCacheItem>(cacheKey, cancellationToken);
+                if (cachedResult != null)
+                {
+                    return Result<(IReadOnlyList<ProductListDto>, int, int)>.Success(
+                        (cachedResult.Items, cachedResult.TotalCount, cachedResult.TotalPages));
+                }
+
                 List<Guid>? getCategoryIdsForFilter = null;
 
                 if (!string.IsNullOrWhiteSpace(getProductsQuery.CategorySlug))
@@ -43,8 +70,11 @@ namespace EComAPI.Application.Products.Queries.GetProducts
 
                     if (getCategoryIdsForFilter.Count == 0)
                     {
+                        var emptyResult = new ProductsQueryCacheItem(new List<ProductListDto>(), 0, 0);
+                        await _cacheService.SetAsync(cacheKey, emptyResult, CacheTtl, cancellationToken);
+
                         return Result<(IReadOnlyList<ProductListDto>, int, int)>.Success(
-                            (new List<ProductListDto>(), 0, 0));
+                            (emptyResult.Items, emptyResult.TotalCount, emptyResult.TotalPages));
                     }
                 }
 
@@ -83,8 +113,11 @@ namespace EComAPI.Application.Products.Queries.GetProducts
                     ));
                 }
 
+                var queryResult = new ProductsQueryCacheItem(productDtos, totalCount, totalPages);
+                await _cacheService.SetAsync(cacheKey, queryResult, CacheTtl, cancellationToken);
+
                 return Result<(IReadOnlyList<ProductListDto>, int, int)>.Success(
-                    (productDtos, totalCount, totalPages));
+                    (queryResult.Items, queryResult.TotalCount, queryResult.TotalPages));
             }
             catch (DomainException domainException)
             {
@@ -94,6 +127,27 @@ namespace EComAPI.Application.Products.Queries.GetProducts
             {
                 return Result<(IReadOnlyList<ProductListDto>, int, int)>.Failure($"Failed to get products: {exception.Message}");
             }
+        }
+
+        private static string BuildProductsQueryCacheKey(GetProductsQuery query, long categoriesVersion, long productsVersion)
+        {
+            var normalized = string.Join(
+                "|",
+                query.CategorySlug?.Trim().ToLowerInvariant() ?? string.Empty,
+                query.IncludeSubcategories,
+                query.MinPrice?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                query.MaxPrice?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                query.InStock?.ToString() ?? string.Empty,
+                query.IncludeInactive,
+                query.SearchTerm?.Trim().ToLowerInvariant() ?? string.Empty,
+                query.SortBy.Trim().ToLowerInvariant(),
+                query.SortOrder.Trim().ToLowerInvariant(),
+                query.Page,
+                query.PageSize);
+
+            var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)));
+
+            return $"query:products:v{productsVersion}:cv{categoriesVersion}:list:{hash}";
         }
 
         private async Task<List<Guid>> GetCategoryIdsForFilter(

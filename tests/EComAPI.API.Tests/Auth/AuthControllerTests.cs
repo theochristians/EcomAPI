@@ -11,6 +11,7 @@ using EComAPI.Domain.Auth.Entities;
 using EComAPI.Domain.Auth.ValueObjects;
 using EComAPI.Infrastructure.Auth.Security;
 using EComAPI.Infrastructure.Common.Persistence.Context;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EComAPI.API.Tests.Auth
@@ -56,6 +57,36 @@ namespace EComAPI.API.Tests.Auth
                 db.Roles.Add(new Role("Admin", Guid.NewGuid()));
                 await db.SaveChangesAsync();
             }
+        }
+
+        private async Task<string> GetLatestOtpCodeAsync(string email)
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var user = await db.Users.FirstAsync(x => x.Email.Value == email.ToLowerInvariant());
+            var emailVerification = await db.EmailVerifications
+                .Where(x => x.UserId == user.Id && x.VerifiedAt == null)
+                .OrderByDescending(x => x.CreatedAt)
+                .FirstAsync();
+
+            return emailVerification.Code;
+        }
+
+        private async Task VerifyEmailByApiAsync(string email)
+        {
+            var sendResponse = await _client.PostAsJsonAsync(
+                "/api/auth/email-verification/send",
+                new SendEmailVerificationByEmailRequest(email));
+
+            sendResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var code = await GetLatestOtpCodeAsync(email);
+            var verifyResponse = await _client.PostAsJsonAsync(
+                "/api/auth/email-verification/verify",
+                new VerifyEmailByEmailRequest(email, code));
+
+            verifyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         }
 
         // ─────────────────────────────────────────────────────────
@@ -140,6 +171,7 @@ namespace EComAPI.API.Tests.Auth
             var email = $"login_{Guid.NewGuid()}@test.com";
             var password = "Password123!";
             await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest("Login User", email, password));
+            await VerifyEmailByApiAsync(email);
 
             // Login
             var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, password, null));
@@ -154,12 +186,31 @@ namespace EComAPI.API.Tests.Auth
         }
 
         [Fact]
+        public async Task Login_EmailBelumTerverifikasi_Returns400()
+        {
+            await EnsureCustomerRoleExists();
+
+            var email = $"unverified_{Guid.NewGuid()}@test.com";
+            var password = "Password123!";
+            await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest("Unverified User", email, password));
+
+            var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, password, null));
+
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+            var body = await response.Content.ReadFromJsonAsync<TestApiResponse<object>>(_json);
+            body!.Success.Should().BeFalse();
+            body.Message.Should().Contain("Email is not verified");
+        }
+
+        [Fact]
         public async Task Login_PasswordSalah_Returns400()
         {
             await EnsureCustomerRoleExists();
 
             var email = $"wrongpw_{Guid.NewGuid()}@test.com";
             await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest("Wrong PW", email, "Password123!"));
+            await VerifyEmailByApiAsync(email);
 
             var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, "WrongPassword!", null));
 
@@ -190,6 +241,7 @@ namespace EComAPI.API.Tests.Auth
             // Register + login to obtain a real refresh token
             var email = $"refresh_{Guid.NewGuid()}@test.com";
             await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest("Refresh User", email, "Password123!"));
+            await VerifyEmailByApiAsync(email);
             var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, "Password123!", null));
             var loginBody = await loginResponse.Content.ReadFromJsonAsync<TestApiResponse<LoginResponse>>(_json);
 
@@ -239,6 +291,7 @@ namespace EComAPI.API.Tests.Auth
 
             var email = $"logout_{Guid.NewGuid()}@test.com";
             await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest("Logout User", email, "Password123!"));
+            await VerifyEmailByApiAsync(email);
             var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, "Password123!", null));
             var loginBody = await loginResponse.Content.ReadFromJsonAsync<TestApiResponse<LoginResponse>>(_json);
 

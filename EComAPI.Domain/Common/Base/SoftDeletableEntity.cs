@@ -17,7 +17,7 @@ namespace EComAPI.Domain.Common.Base
 
             Guard.AgainstEmptyGuid(deletedBy, "DeletedBy is required");
 
-            DeletedAt = DateTime.UtcNow;
+            DeletedAt = JakartaTime.Now;
             DeletedBy = deletedBy;
         }
 

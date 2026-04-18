@@ -11,14 +11,14 @@ namespace EComAPI.Domain.Common.Base
 
         protected AuditableEntity()
         {
-            CreatedAt = DateTime.UtcNow;
+            CreatedAt = JakartaTime.Now;
         }
 
         protected void SetCreated(Guid userId)
         {
             Guard.AgainstEmptyGuid(userId, "CreatedBy is required");
 
-            CreatedAt = DateTime.UtcNow;
+            CreatedAt = JakartaTime.Now;
             CreatedBy = userId;
         }
 
@@ -26,7 +26,7 @@ namespace EComAPI.Domain.Common.Base
         {
             Guard.AgainstEmptyGuid(userId, "UpdatedBy is required");
 
-            UpdatedAt = DateTime.UtcNow;
+            UpdatedAt = JakartaTime.Now;
             UpdatedBy = userId;
         }
     }

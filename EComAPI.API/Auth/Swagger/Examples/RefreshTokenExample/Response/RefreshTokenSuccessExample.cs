@@ -13,7 +13,7 @@ namespace EComAPI.API.Auth.Swagger.Examples.RefreshTokenExample.Response
                 new LoginResponse(
                     AccessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example.new.access.token",
                     RefreshToken: "a8c7d6e5-example-new-refresh-token",
-                    AccessTokenExpiresAt: DateTime.UtcNow.AddMinutes(15),
+                    AccessTokenExpiresAt: DateTime.UtcNow.AddMinutes(120),
                     RefreshTokenExpiresAt: DateTime.UtcNow.AddDays(7)
                 ),
                 "Token refreshed successfully"

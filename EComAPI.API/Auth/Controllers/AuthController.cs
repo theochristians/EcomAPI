@@ -16,9 +16,14 @@ using EComAPI.API.Auth.Swagger.Examples.RegisterExample.Request;
 using EComAPI.API.Auth.Swagger.Examples.RegisterExample.Response;
 using EComAPI.Application.Auth.Commands.LoginUser;
 using EComAPI.Application.Auth.Commands.LogoutUser;
+using EComAPI.Application.Auth.Commands.ForgotPassword;
 using EComAPI.Application.Auth.Commands.RefreshTokens;
 using EComAPI.Application.Auth.Commands.RegisterUser;
+using EComAPI.Application.Auth.Commands.ResetPassword;
+using EComAPI.Application.Auth.Commands.SendEmailVerificationByEmail;
+using EComAPI.Application.Auth.Commands.VerifyEmailByEmail;
 using EComAPI.API.Common.Security;
+using EComAPI.API.Common.Time;
 
 namespace EComAPI.API.Auth.Controllers
 {
@@ -42,6 +47,10 @@ namespace EComAPI.API.Auth.Controllers
         private readonly LoginUserHandler _loginUserHandler;
         private readonly RefreshTokenHandler _refreshTokenHandler;
         private readonly LogoutUserHandler _logoutUserHandler;
+        private readonly SendEmailVerificationByEmailHandler _sendEmailVerificationByEmailHandler;
+        private readonly VerifyEmailByEmailHandler _verifyEmailByEmailHandler;
+        private readonly ForgotPasswordHandler _forgotPasswordHandler;
+        private readonly ResetPasswordHandler _resetPasswordHandler;
 
         /// <summary>
         /// Inisialisasi AuthController dengan seluruh handler autentikasi yang dibutuhkan.
@@ -50,16 +59,28 @@ namespace EComAPI.API.Auth.Controllers
         /// <param name="loginUserHandler">Handler untuk proses login pengguna.</param>
         /// <param name="refreshTokenHandler">Handler untuk proses refresh access token.</param>
         /// <param name="logoutUserHandler">Handler untuk proses logout dan revokasi token.</param>
+        /// <param name="sendEmailVerificationByEmailHandler">Handler kirim OTP verifikasi email tanpa login.</param>
+        /// <param name="verifyEmailByEmailHandler">Handler verifikasi email dengan email + OTP tanpa login.</param>
+        /// <param name="forgotPasswordHandler">Handler request OTP forgot password.</param>
+        /// <param name="resetPasswordHandler">Handler reset password menggunakan OTP.</param>
         public AuthController(
             RegisterUserHandler registerUserHandler,
             LoginUserHandler loginUserHandler,
             RefreshTokenHandler refreshTokenHandler,
-            LogoutUserHandler logoutUserHandler)
+            LogoutUserHandler logoutUserHandler,
+            SendEmailVerificationByEmailHandler sendEmailVerificationByEmailHandler,
+            VerifyEmailByEmailHandler verifyEmailByEmailHandler,
+            ForgotPasswordHandler forgotPasswordHandler,
+            ResetPasswordHandler resetPasswordHandler)
         {
             _registerUserHandler = registerUserHandler;
             _loginUserHandler = loginUserHandler;
             _refreshTokenHandler = refreshTokenHandler;
             _logoutUserHandler = logoutUserHandler;
+            _sendEmailVerificationByEmailHandler = sendEmailVerificationByEmailHandler;
+            _verifyEmailByEmailHandler = verifyEmailByEmailHandler;
+            _forgotPasswordHandler = forgotPasswordHandler;
+            _resetPasswordHandler = resetPasswordHandler;
         }
 
         /// <summary>
@@ -121,8 +142,62 @@ namespace EComAPI.API.Auth.Controllers
                     registeredUserDto.Email,
                     registeredUserDto.IsEmailVerified
                 ),
-                "User registered successfully"
+                "User registered successfully. Please verify email before login"
             );
+        }
+
+        /// <summary>
+        /// Mengirim OTP verifikasi email berdasarkan email (tanpa login).
+        /// </summary>
+        /// <remarks>
+        /// Endpoint: POST api/auth/email-verification/send
+        /// </remarks>
+        [HttpPost]
+        [Route("email-verification/send")]
+        [AllowAnonymous]
+        [EnableRateLimiting("email-verify-send")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> SendEmailVerificationByEmail(
+            SendEmailVerificationByEmailRequest sendEmailVerificationByEmailRequest,
+            CancellationToken cancellationToken)
+        {
+            var sendCommand = new SendEmailVerificationByEmailCommand(sendEmailVerificationByEmailRequest.Email);
+            var sendResult = await _sendEmailVerificationByEmailHandler.Handle(sendCommand, cancellationToken);
+
+            if (!sendResult.IsSuccess)
+                return BadRequestResponse(sendResult.Error ?? "Failed to send verification code");
+
+            return SuccessResponse(
+                new { expiresAt = ApiTime.ToJakartaOffset(sendResult.Value) },
+                "If the email is registered, verification code has been sent");
+        }
+
+        /// <summary>
+        /// Verifikasi email menggunakan email + OTP (tanpa login).
+        /// </summary>
+        /// <remarks>
+        /// Endpoint: POST api/auth/email-verification/verify
+        /// </remarks>
+        [HttpPost]
+        [Route("email-verification/verify")]
+        [AllowAnonymous]
+        [EnableRateLimiting("email-verify-check")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> VerifyEmailByEmail(
+            VerifyEmailByEmailRequest verifyEmailByEmailRequest,
+            CancellationToken cancellationToken)
+        {
+            var verifyCommand = new VerifyEmailByEmailCommand(
+                verifyEmailByEmailRequest.Email,
+                verifyEmailByEmailRequest.Code);
+
+            var verifyResult = await _verifyEmailByEmailHandler.Handle(verifyCommand, cancellationToken);
+            if (!verifyResult.IsSuccess)
+                return BadRequestResponse(verifyResult.Error ?? "Email verification failed");
+
+            return SuccessResponse(new { isEmailVerified = true }, "Email verified successfully");
         }
 
         /// <summary>
@@ -139,7 +214,7 @@ namespace EComAPI.API.Auth.Controllers
         /// 5. Jika valid, kembalikan access token dan refresh token.
         ///
         /// Catatan keamanan:
-        /// - Access Token (JWT) kedaluwarsa cepat (15 menit).
+        /// - Access Token (JWT) kedaluwarsa sesuai konfigurasi JwtSettings:ExpiryMinutes.
         /// - Refresh Token berumur lebih panjang (7 hari).
         /// - Simpan refresh token secara aman di sisi client.
         /// </remarks>
@@ -193,6 +268,61 @@ namespace EComAPI.API.Auth.Controllers
                 ),
                 "Login successful"
             );
+        }
+
+        /// <summary>
+        /// Meminta OTP reset password berdasarkan email.
+        /// </summary>
+        /// <remarks>
+        /// Endpoint: POST api/auth/forgot-password
+        /// </remarks>
+        [HttpPost]
+        [Route("forgot-password")]
+        [AllowAnonymous]
+        [EnableRateLimiting("email-verify-send")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ForgotPassword(
+            ForgotPasswordRequest forgotPasswordRequest,
+            CancellationToken cancellationToken)
+        {
+            var forgotCommand = new ForgotPasswordCommand(forgotPasswordRequest.Email);
+            var forgotResult = await _forgotPasswordHandler.Handle(forgotCommand, cancellationToken);
+
+            if (!forgotResult.IsSuccess)
+                return BadRequestResponse(forgotResult.Error ?? "Failed to process forgot password");
+
+            return SuccessResponse(
+                new { expiresAt = ApiTime.ToJakartaOffset(forgotResult.Value) },
+                "If the email is registered, reset code has been sent");
+        }
+
+        /// <summary>
+        /// Reset password menggunakan email + OTP + password baru.
+        /// </summary>
+        /// <remarks>
+        /// Endpoint: POST api/auth/reset-password
+        /// </remarks>
+        [HttpPost]
+        [Route("reset-password")]
+        [AllowAnonymous]
+        [EnableRateLimiting("email-verify-check")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ResetPassword(
+            ResetPasswordRequest resetPasswordRequest,
+            CancellationToken cancellationToken)
+        {
+            var resetCommand = new ResetPasswordCommand(
+                resetPasswordRequest.Email,
+                resetPasswordRequest.Code,
+                resetPasswordRequest.NewPassword);
+
+            var resetResult = await _resetPasswordHandler.Handle(resetCommand, cancellationToken);
+            if (!resetResult.IsSuccess)
+                return BadRequestResponse(resetResult.Error ?? "Password reset failed");
+
+            return SuccessResponse(new { isPasswordReset = true }, "Password reset successfully");
         }
 
         /// <summary>

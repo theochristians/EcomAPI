@@ -71,7 +71,8 @@ namespace EComAPI.API.Tests.Infrastructure
                 {
                     "categories.read", "categories.create", "categories.update", "categories.delete", "categories.restore",
                     "products.read", "products.create", "products.update", "products.delete", "products.restore",
-                    "users.read.all", "users.create", "users.update.any", "users.delete.any", "users.restore.any"
+                    "users.read.all", "users.create", "users.update.any", "users.delete.any", "users.restore.any",
+                    "orders.read.all", "orders.update.any", "orders.delete.any", "orders.read.own", "orders.create", "orders.cancel.own"
                 }
             );
         }

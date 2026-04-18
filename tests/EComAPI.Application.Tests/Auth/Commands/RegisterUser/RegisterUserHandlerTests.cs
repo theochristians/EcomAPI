@@ -4,6 +4,7 @@ using Xunit;
 using EComAPI.Application.Auth.Commands.RegisterUser;
 using EComAPI.Application.Auth.Interfaces;
 using EComAPI.Application.Common.Interfaces;
+using EComAPI.Application.Shopping.Interfaces;
 using EComAPI.Domain.Auth.Entities;
 
 namespace EComAPI.Application.Tests.Auth.Commands.RegisterUser
@@ -13,6 +14,9 @@ namespace EComAPI.Application.Tests.Auth.Commands.RegisterUser
         private readonly Mock<IUserRepository> _mockUserRepository;
         private readonly Mock<IRoleRepository> _mockRoleRepository;
         private readonly Mock<IPasswordHasher> _mockPasswordHasher;
+        private readonly Mock<ICartRepository> _mockCartRepository;
+        private readonly Mock<IEmailVerificationRepository> _mockEmailVerificationRepository;
+        private readonly Mock<IEmailSender> _mockEmailSender;
         private readonly Mock<IUnitOfWork> _mockUnitOfWork;
         private readonly RegisterUserHandler _registerUserHandler; 
 
@@ -21,12 +25,18 @@ namespace EComAPI.Application.Tests.Auth.Commands.RegisterUser
             _mockUserRepository = new Mock<IUserRepository>();
             _mockRoleRepository = new Mock<IRoleRepository>();
             _mockPasswordHasher = new Mock<IPasswordHasher>();
+            _mockCartRepository = new Mock<ICartRepository>();
+            _mockEmailVerificationRepository = new Mock<IEmailVerificationRepository>();
+            _mockEmailSender = new Mock<IEmailSender>();
             _mockUnitOfWork = new Mock<IUnitOfWork>();
             
             _registerUserHandler = new RegisterUserHandler(
                 _mockUserRepository.Object,
                 _mockRoleRepository.Object,
                 _mockPasswordHasher.Object,
+                _mockCartRepository.Object,
+                _mockEmailVerificationRepository.Object,
+                _mockEmailSender.Object,
                 _mockUnitOfWork.Object
             );
         }
@@ -140,7 +150,18 @@ namespace EComAPI.Application.Tests.Auth.Commands.RegisterUser
             registerUserResult.Value.FullName.Should().Be(registerUserCommand.FullName);
 
             _mockUserRepository.Verify(x => x.AddUserAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Once);
-            _mockUnitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+            _mockEmailVerificationRepository.Verify(
+                x => x.AddEmailVerificationAsync(It.IsAny<EmailVerification>(), It.IsAny<CancellationToken>()),
+                Times.Once);
+            _mockEmailSender.Verify(
+                x => x.SendEmailVerificationCodeAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<DateTime>(),
+                    It.IsAny<CancellationToken>()),
+                Times.Once);
+            _mockUnitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Exactly(2));
         }
 
         [Fact]

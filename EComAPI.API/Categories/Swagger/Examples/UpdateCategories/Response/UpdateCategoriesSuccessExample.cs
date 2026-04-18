@@ -1,7 +1,7 @@
 ﻿using EComAPI.API.Common;
 using Swashbuckle.AspNetCore.Filters;
 
-namespace EComAPI.API.Categories.Swagger.Examples.UpdateCategory.Response
+namespace EComAPI.API.Categories.Swagger.Examples.UpdateCategories.Response
 {
     public class UpdateCategoriesSuccessExample
         : IExamplesProvider<ApiResponse<object>>

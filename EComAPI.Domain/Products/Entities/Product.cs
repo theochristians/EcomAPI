@@ -105,7 +105,7 @@ namespace EComAPI.Domain.Products.Entities
         public void IncreaseView()
         {
             ViewCount++;
-            UpdatedAt = DateTime.UtcNow;
+            UpdatedAt = JakartaTime.Now;
         }
 
         public void Update(
@@ -167,7 +167,7 @@ namespace EComAPI.Domain.Products.Entities
 
             IsActive = false;
 
-            DeletedAt = DateTime.UtcNow;
+            DeletedAt = JakartaTime.Now;
             DeletedBy = deletedBy;
         }
 

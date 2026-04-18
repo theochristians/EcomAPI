@@ -13,9 +13,6 @@ namespace EComAPI.Infrastructure.Auth.Persistence.Repositories
         {
             _appDbContext = appDbContext;
         }
-
-        #region RefreshToken Methods
-
         public async Task AddRefreshTokenAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default)
         {
             await _appDbContext.RefreshTokens.AddAsync(refreshToken, cancellationToken);
@@ -29,12 +26,22 @@ namespace EComAPI.Infrastructure.Auth.Persistence.Repositories
                 .FirstOrDefaultAsync(refreshToken => refreshToken.TokenHash == tokenHash, cancellationToken);
         }
 
+        public async Task<List<RefreshToken>> GetActiveByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
+        {
+            var now = SecurityTime.UtcNow;
+
+            return await _appDbContext.RefreshTokens
+                .Where(refreshToken =>
+                    refreshToken.UserId == userId &&
+                    refreshToken.RevokedAt == null &&
+                    refreshToken.ExpiresAt > now)
+                .ToListAsync(cancellationToken);
+        }
+
         public Task UpdateRefreshTokenAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default)
         {
             _appDbContext.RefreshTokens.Update(refreshToken);
             return Task.CompletedTask;
         }
-
-        #endregion
     }
 }

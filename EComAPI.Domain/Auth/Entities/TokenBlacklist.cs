@@ -12,7 +12,7 @@ namespace EComAPI.Domain.Auth.Entities
         public string Reason { get; private set; }
         public DateTime ExpiresAt { get; private set; }
 
-        public bool IsExpired => DateTime.UtcNow >= ExpiresAt;
+        public bool IsExpired => SecurityTime.UtcNow >= ExpiresAt;
 
         private TokenBlacklist() { }
 
@@ -32,7 +32,7 @@ namespace EComAPI.Domain.Auth.Entities
             var reasonValue = Guard.AgainstNullOrWhiteSpace(reason, "Reason is required");
             Guard.AgainstMaxLength(reasonValue, 500, "Reason cannot exceed 500 characters");
 
-            if (expiresAt <= DateTime.UtcNow)
+            if (expiresAt <= SecurityTime.UtcNow)
                 throw new DomainException("Expiration date must be in the future");
 
             UserId = userId;

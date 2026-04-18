@@ -16,7 +16,7 @@ namespace EComAPI.Domain.Auth.Entities
         public string? UserAgent { get; private set; }
         public string? DeviceName { get; private set; }
 
-        public bool IsExpired => DateTime.UtcNow >= ExpiresAt;
+        public bool IsExpired => SecurityTime.UtcNow >= ExpiresAt;
         public bool IsRevoked => RevokedAt.HasValue;
         public bool IsActive => !IsRevoked && !IsExpired;
 
@@ -37,7 +37,7 @@ namespace EComAPI.Domain.Auth.Entities
             var tokenHashValue = Guard.AgainstNullOrWhiteSpace(tokenHash, "Token hash is required");
             Guard.AgainstMaxLength(tokenHashValue, 500, "Token hash cannot exceed 500 characters");
 
-            if (expiresAt <= DateTime.UtcNow)
+            if (expiresAt <= SecurityTime.UtcNow)
                 throw new DomainException("Expiration date must be in the future");
 
             UserId = userId;
@@ -60,7 +60,7 @@ namespace EComAPI.Domain.Auth.Entities
             var reasonValue = Guard.AgainstNullOrWhiteSpace(reason, "Revoke reason is required");
             Guard.AgainstMaxLength(reasonValue, 500, "Revoke reason cannot exceed 500 characters");
 
-            RevokedAt = DateTime.UtcNow;
+            RevokedAt = SecurityTime.UtcNow;
             RevokeReason = reasonValue;
             SetUpdated(updatedBy);
         }

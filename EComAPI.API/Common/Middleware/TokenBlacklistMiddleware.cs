@@ -2,7 +2,11 @@
 using EComAPI.API.Common.Security;
 using EComAPI.Application.Auth.Interfaces;
 using EComAPI.Application.Common.Security;
+using EComAPI.Infrastructure.Common.Persistence.Context;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.JsonWebTokens;
 using System.Net;
+using System.Security.Claims;
 
 namespace EComAPI.API.Common.Middleware
 {
@@ -17,7 +21,8 @@ namespace EComAPI.API.Common.Middleware
 
         public async Task InvokeAsync(
             HttpContext context,
-            ITokenBlacklistRepository tokenBlacklistRepository)
+            ITokenBlacklistRepository tokenBlacklistRepository,
+            AppDbContext appDbContext)
         {
             var endpoint = context.GetEndpoint();
             var allowAnonymous =
@@ -47,9 +52,52 @@ namespace EComAPI.API.Common.Middleware
 
                     return;
                 }
+
+                var subClaim = context.User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+                if (Guid.TryParse(subClaim, out var userId))
+                {
+                    var latestUsedResetAt = await appDbContext.PasswordResets
+                        .AsNoTracking()
+                        .Where(passwordReset => passwordReset.UserId == userId && passwordReset.UsedAt != null)
+                        .OrderByDescending(passwordReset => passwordReset.UsedAt)
+                        .Select(passwordReset => passwordReset.UsedAt)
+                        .FirstOrDefaultAsync(context.RequestAborted);
+
+                    if (latestUsedResetAt.HasValue)
+                    {
+                        var issuedAt = ResolveIssuedAtUtc(context.User, token);
+
+                        if (issuedAt <= latestUsedResetAt.Value)
+                        {
+                            context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
+                            context.Response.ContentType = "application/json";
+
+                            var response = ApiResponse<object>.Fail("Session expired due to password reset. Please login again");
+                            await context.Response.WriteAsJsonAsync(response);
+
+                            return;
+                        }
+                    }
+                }
             }
 
             await _next(context);
+        }
+
+        private static DateTime ResolveIssuedAtUtc(ClaimsPrincipal principal, string rawToken)
+        {
+            var issuedAtClaim = principal.FindFirstValue(JwtRegisteredClaimNames.Iat);
+            if (long.TryParse(issuedAtClaim, out var issuedAtEpochSeconds))
+                return DateTimeOffset.FromUnixTimeSeconds(issuedAtEpochSeconds).UtcDateTime;
+
+            var handler = new JsonWebTokenHandler();
+            if (handler.CanReadToken(rawToken))
+            {
+                var jsonWebToken = handler.ReadJsonWebToken(rawToken);
+                return jsonWebToken.ValidFrom;
+            }
+
+            return DateTime.MinValue;
         }
     }
 }

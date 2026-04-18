@@ -1,4 +1,6 @@
-﻿using EComAPI.Application.Categories.Interfaces;
+using EComAPI.Application.Categories.Interfaces;
+using EComAPI.Application.Common.Constants;
+using EComAPI.Infrastructure.Common.Caching;
 using EComAPI.Domain.Categories.Entities;
 using EComAPI.Infrastructure.Common.Persistence.Context;
 using Microsoft.EntityFrameworkCore;
@@ -8,15 +10,17 @@ namespace EComAPI.Infrastructure.Categories.Persistence.Repositories
     public class CategoryRepository : ICategoryRepository
     {
         private readonly AppDbContext _appDbContext;
+        private readonly ICacheInvalidationBuffer _cacheInvalidationBuffer;
 
-        public CategoryRepository(AppDbContext appDbContext)
+        public CategoryRepository(
+            AppDbContext appDbContext,
+            ICacheInvalidationBuffer cacheInvalidationBuffer)
         {
             _appDbContext = appDbContext;
+            _cacheInvalidationBuffer = cacheInvalidationBuffer;
         }
 
-        // ==========================================
         // BASIC CRUD OPERATIONS
-        // ==========================================
         public async Task<Category?> GetCategoryByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
             return await _appDbContext.Categories
@@ -47,19 +51,16 @@ namespace EComAPI.Infrastructure.Categories.Persistence.Repositories
         public async Task AddCategoryAsync(Category category, CancellationToken cancellationToken = default)
         {
             await _appDbContext.Categories.AddAsync(category, cancellationToken);
-            // ❌ NO SaveChangesAsync - use UoW
+            InvalidateCategoryCache();
         }
 
-        public Task UpdateCategoryAsync(Category category, CancellationToken cancellationToken = default)
+        public async Task UpdateCategoryAsync(Category category, CancellationToken cancellationToken = default)
         {
             _appDbContext.Categories.Update(category);
-            // ❌ NO SaveChangesAsync - use UoW
-            return Task.CompletedTask;
+            InvalidateCategoryCache();
         }
 
-        // ==========================================
         // EXISTENCE CHECKS
-        // ==========================================
         public async Task<bool> CategoryExistsAsync(Guid id, CancellationToken cancellationToken = default)
         {
             return await _appDbContext.Categories
@@ -72,18 +73,13 @@ namespace EComAPI.Infrastructure.Categories.Persistence.Repositories
                 .AnyAsync(category => category.Slug == slug, cancellationToken);
         }
 
-        // ==========================================
         // SPECIALIZED BUSINESS QUERIES
-        // ==========================================
         public async Task<int> GetProductCountAsync(Guid categoryId, CancellationToken cancellationToken = default)
         {
-            // Get all subcategory IDs (recursive)
             var categoryIds = await GetCategoryIdsRecursiveAsync(categoryId, cancellationToken);
 
-            // Add parent category
             categoryIds.Add(categoryId);
 
-            // Count products in all these categories
             var count = await _appDbContext.Products
                 .Where(product => categoryIds.Contains(product.CategoryId))
                 .CountAsync(cancellationToken);
@@ -106,14 +102,12 @@ namespace EComAPI.Infrastructure.Categories.Persistence.Repositories
 
         public async Task<bool> HasActiveProductsAsync(Guid categoryId, CancellationToken cancellationToken = default)
         {
-            // Check products in this category
             var hasProducts = await _appDbContext.Products
                 .AnyAsync(product => product.CategoryId == categoryId, cancellationToken);
 
             if (hasProducts)
                 return true;
 
-            // Check products in subcategories (recursive)
             var subcategoryIds = await GetCategoryIdsRecursiveAsync(categoryId, cancellationToken);
 
             if (subcategoryIds.Any())
@@ -137,14 +131,11 @@ namespace EComAPI.Infrastructure.Categories.Persistence.Repositories
                 .CountAsync(category => category.ParentId == categoryId, cancellationToken);
         }
 
-        // ==========================================
         // PRIVATE HELPER METHODS
-        // ==========================================
         private async Task<List<Guid>> GetCategoryIdsRecursiveAsync(Guid categoryId, CancellationToken cancellationToken = default)
         {
             var result = new List<Guid>();
 
-            // Get direct children
             var children = await _appDbContext.Categories
                 .Where(category => category.ParentId == categoryId)
                 .Select(category => category.Id)
@@ -152,7 +143,6 @@ namespace EComAPI.Infrastructure.Categories.Persistence.Repositories
 
             result.AddRange(children);
 
-            // Recursively get children of children
             foreach (var childId in children)
             {
                 var subChildren = await GetCategoryIdsRecursiveAsync(childId, cancellationToken);
@@ -161,5 +151,8 @@ namespace EComAPI.Infrastructure.Categories.Persistence.Repositories
 
             return result;
         }
+
+        private void InvalidateCategoryCache()
+            => _cacheInvalidationBuffer.MarkNamespaceDirty(CacheKeys.CategoriesNamespace);
     }
 }

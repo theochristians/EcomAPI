@@ -2,23 +2,28 @@ using EComAPI.Application.Common.Interfaces;
 using EComAPI.Application.Common.Interfaces.Identity;
 using EComAPI.Application.Common.Result;
 using EComAPI.Application.Products.Interfaces;
+using EComAPI.Application.Transaction.Interfaces;
 using EComAPI.Domain.Common.Exceptions;
 using EComAPI.Domain.Products.Entities;
+using EComAPI.Domain.Transaction.Entities;
 
 namespace EComAPI.Application.Products.Commands.ProductVariantCommands.AddProductVariant
 {
     public class AddProductVariantHandler
     {
         private readonly IProductRepository _productRepository;
+        private readonly IStockLogRepository _stockLogRepository;
         private readonly ICurrentUser _currentUser;
         private readonly IUnitOfWork _unitOfWork;
 
         public AddProductVariantHandler(
             IProductRepository productRepository,
+            IStockLogRepository stockLogRepository,
             ICurrentUser currentUser,
             IUnitOfWork unitOfWork)
         {
             _productRepository = productRepository;
+            _stockLogRepository = stockLogRepository;
             _currentUser = currentUser;
             _unitOfWork = unitOfWork;
         }
@@ -61,6 +66,22 @@ namespace EComAPI.Application.Products.Commands.ProductVariantCommands.AddProduc
                 productWithVariants.AddVariant(productVariant);
 
                 await _productRepository.AddProductVariantAsync(productVariant, cancellationToken);
+
+                // Log initial stock
+                if (productVariant.Stock > 0)
+                {
+                    var stockLog = new StockLog(
+                        productVariantId: productVariant.Id,
+                        type: "initial",
+                        quantityChange: productVariant.Stock,
+                        stockBefore: 0,
+                        stockAfter: productVariant.Stock,
+                        createdBy: _currentUser.UserId,
+                        note: "Initial stock for new variant");
+
+                    await _stockLogRepository.AddLogAsync(stockLog, cancellationToken);
+                }
+
                 await _productRepository.UpdateProductAsync(productWithVariants, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 

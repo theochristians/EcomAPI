@@ -1,6 +1,6 @@
-﻿using EComAPI.Application.Auth.Interfaces;
 using EComAPI.Infrastructure.Auth.Persistence.Seeders;
 using EComAPI.Infrastructure.Common.Persistence.Context;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EComAPI.Infrastructure.Common.Persistence.Seed
@@ -11,14 +11,14 @@ namespace EComAPI.Infrastructure.Common.Persistence.Seed
         {
             using var scope = serviceProvider.CreateScope();
             var appDbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-            Console.WriteLine("🌱 Starting database seeding...");
+            Console.WriteLine("Starting database seeding...");
 
-            await PermissionSeeder.SeedAsync(appDbContext);
-            await AdminSeeder.SeedAsync(appDbContext, passwordHasher);
+            await PermissionSeeder.SeedAsync(
+                appDbContext,
+                scope.ServiceProvider.GetRequiredService<IConfiguration>());
 
-            Console.WriteLine("✅ Database seeding completed!");
+            Console.WriteLine("Database seeding completed!");
         }
     }
 }

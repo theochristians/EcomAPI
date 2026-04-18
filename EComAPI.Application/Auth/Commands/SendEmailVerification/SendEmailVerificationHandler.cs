@@ -57,7 +57,7 @@ namespace EComAPI.Application.Auth.Commands.SendEmailVerification
                 }
 
                 var verificationCode = GenerateVerificationCode();
-                var expiresAt = DateTime.UtcNow.AddMinutes(10);
+                var expiresAt = SecurityTime.UtcNow.AddMinutes(10);
 
                 var emailVerification = new EmailVerification(
                     userById.Id,

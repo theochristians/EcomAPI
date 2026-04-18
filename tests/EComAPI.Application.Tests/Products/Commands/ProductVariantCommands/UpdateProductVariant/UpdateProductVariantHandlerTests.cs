@@ -2,6 +2,7 @@
 using EComAPI.Application.Common.Interfaces.Identity;
 using EComAPI.Application.Products.Commands.ProductVariantCommands.UpdateProductVariant;
 using EComAPI.Application.Products.Interfaces;
+using EComAPI.Application.Transaction.Interfaces;
 using EComAPI.Domain.Products.Entities;
 using FluentAssertions;
 using Moq;
@@ -12,6 +13,7 @@ namespace EComAPI.Application.Tests.Products.Commands.ProductVariantCommands.Upd
     public class UpdateProductVariantHandlerTests
     {
         private readonly Mock<IProductRepository> _mockProductRepository;
+        private readonly Mock<IStockLogRepository> _mockStockLogRepository;
         private readonly Mock<ICurrentUser> _mockCurrentUser;
         private readonly Mock<IUnitOfWork> _mockUnitOfWork;
         private readonly UpdateProductVariantHandler _updateProductVariantHandler;
@@ -22,11 +24,13 @@ namespace EComAPI.Application.Tests.Products.Commands.ProductVariantCommands.Upd
         public UpdateProductVariantHandlerTests()
         {
             _mockProductRepository = new Mock<IProductRepository>();
+            _mockStockLogRepository = new Mock<IStockLogRepository>();
             _mockCurrentUser = new Mock<ICurrentUser>();
             _mockUnitOfWork = new Mock<IUnitOfWork>();
 
             _updateProductVariantHandler = new UpdateProductVariantHandler(
                 _mockProductRepository.Object,
+                _mockStockLogRepository.Object,
                 _mockCurrentUser.Object,
                 _mockUnitOfWork.Object
             );

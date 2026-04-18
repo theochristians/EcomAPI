@@ -15,7 +15,7 @@ namespace EComAPI.Domain.Auth.Entities
 
         private const int MaxAttempts = 5;
 
-        public bool IsExpired => DateTime.UtcNow >= ExpiresAt;
+        public bool IsExpired => SecurityTime.UtcNow >= ExpiresAt;
         public bool IsVerified => VerifiedAt.HasValue;
         public bool IsMaxAttemptsReached => Attempts >= MaxAttempts;
         public bool IsValid => !IsExpired && !IsVerified && !IsMaxAttemptsReached;
@@ -33,7 +33,7 @@ namespace EComAPI.Domain.Auth.Entities
             Guard.AgainstMinLength(normalizedCode, 6, "Verification code must be 6 characters");
             Guard.AgainstMaxLength(normalizedCode, 6, "Verification code must be 6 characters");
 
-            if (expiresAt <= DateTime.UtcNow)
+            if (expiresAt <= SecurityTime.UtcNow)
                 throw new DomainException("Expiration date must be in the future");
 
             Guard.AgainstEmptyGuid(createdBy, "CreatedBy cannot be empty");
@@ -71,7 +71,7 @@ namespace EComAPI.Domain.Auth.Entities
 
             Guard.AgainstEmptyGuid(updatedBy, "UpdatedBy is required");
 
-            VerifiedAt = DateTime.UtcNow;
+            VerifiedAt = SecurityTime.UtcNow;
             SetUpdated(updatedBy);
         }
     }

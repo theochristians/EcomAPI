@@ -12,6 +12,7 @@ namespace EComAPI.Application.Tests.Auth.Commands.LoginUser
     public class LoginUserHandlerTests
     {
         private readonly Mock<IUserRepository> _mockUserRepository;
+        private readonly Mock<ILoginHistoryRepository> _mockLoginHistoryRepository;
         private readonly Mock<IRefreshTokenRepository> _mockRefreshTokenRepository;
         private readonly Mock<IPasswordHasher> _mockPasswordHasher;
         private readonly Mock<IJwtTokenGenerator> _mockJwtTokenGenerator;
@@ -21,6 +22,7 @@ namespace EComAPI.Application.Tests.Auth.Commands.LoginUser
         public LoginUserHandlerTests()
         {
             _mockUserRepository = new Mock<IUserRepository>();
+            _mockLoginHistoryRepository = new Mock<ILoginHistoryRepository>();
             _mockRefreshTokenRepository = new Mock<IRefreshTokenRepository>();
             _mockPasswordHasher = new Mock<IPasswordHasher>();
             _mockJwtTokenGenerator = new Mock<IJwtTokenGenerator>();
@@ -28,6 +30,7 @@ namespace EComAPI.Application.Tests.Auth.Commands.LoginUser
 
             _loginUserHandler = new LoginUserHandler(
                 _mockUserRepository.Object,
+                _mockLoginHistoryRepository.Object,
                 _mockRefreshTokenRepository.Object,
                 _mockPasswordHasher.Object,
                 _mockJwtTokenGenerator.Object,
@@ -73,6 +76,31 @@ namespace EComAPI.Application.Tests.Auth.Commands.LoginUser
         }
 
         [Fact]
+        public async Task Handle_EmailBelumTerverifikasi_ShouldReturnFailure()
+        {
+            var loginUserCommand = new LoginUserCommand(Email: "john@example.com", Password: "password123");
+
+            var roleId = Guid.NewGuid();
+            var userId = Guid.NewGuid();
+            var user = new User(
+                "John Doe",
+                EmailAddress.Create("john@example.com"),
+                PasswordHash.FromHash("hashedpass"),
+                roleId,
+                userId
+            );
+
+            _mockUserRepository
+                .Setup(x => x.GetUserByEmailAsync("john@example.com", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(user);
+
+            var loginUserResult = await _loginUserHandler.Handle(loginUserCommand);
+
+            loginUserResult.IsSuccess.Should().BeFalse();
+            loginUserResult.Error.Should().Contain("Email is not verified");
+        }
+
+        [Fact]
         public async Task Handle_PasswordSalah_ShouldReturnFailure()
         {
             var loginUserCommand = new LoginUserCommand(Email: "john@example.com", Password: "wrongpassword");
@@ -86,6 +114,7 @@ namespace EComAPI.Application.Tests.Auth.Commands.LoginUser
                 roleId,
                 userId
             );
+            user.VerifyEmail(userId);
 
             _mockUserRepository
                 .Setup(x => x.GetUserByEmailAsync("john@example.com", It.IsAny<CancellationToken>()))
@@ -115,6 +144,7 @@ namespace EComAPI.Application.Tests.Auth.Commands.LoginUser
                 roleId,
                 userId
             );
+            user.VerifyEmail(userId);
 
             _mockUserRepository
                 .Setup(x => x.GetUserByEmailAsync("john@example.com", It.IsAny<CancellationToken>()))
@@ -137,6 +167,9 @@ namespace EComAPI.Application.Tests.Auth.Commands.LoginUser
 
             _mockRefreshTokenRepository.Verify(
                 x => x.AddRefreshTokenAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()),
+                Times.Once);
+            _mockLoginHistoryRepository.Verify(
+                x => x.AddLoginHistoryAsync(It.IsAny<LoginHistory>(), It.IsAny<CancellationToken>()),
                 Times.Once);
             _mockUnitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         }

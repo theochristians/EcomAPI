@@ -1,7 +1,9 @@
 ﻿using EComAPI.Domain.Auth.Entities;
-using EComAPI.Domain.Categories.Entities; // ✅ ADD THIS LINE!
+using EComAPI.Domain.Categories.Entities;
 using EComAPI.Domain.Common.Base;
 using EComAPI.Domain.Products.Entities;
+using EComAPI.Domain.Shopping.Entities;
+using EComAPI.Domain.Transaction.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
@@ -35,6 +37,21 @@ namespace EComAPI.Infrastructure.Common.Persistence.Context
         public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
         public DbSet<ProductImage> ProductImages => Set<ProductImage>();
         public DbSet<Category> Categories => Set<Category>();
+        public DbSet<Cart> Carts => Set<Cart>();
+        public DbSet<CartItem> CartItems => Set<CartItem>();
+        public DbSet<Wishlist> Wishlists => Set<Wishlist>();
+        public DbSet<Order> Orders => Set<Order>();
+        public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+        public DbSet<Payment> Payments => Set<Payment>();
+        public DbSet<Coupon> Coupons => Set<Coupon>();
+        public DbSet<CouponUsage> CouponUsages => Set<CouponUsage>();
+        public DbSet<Review> Reviews => Set<Review>();
+        public DbSet<ReviewImage> ReviewImages => Set<ReviewImage>();
+        public DbSet<Return> Returns => Set<Return>();
+        public DbSet<ReturnItem> ReturnItems => Set<ReturnItem>();
+        public DbSet<ReturnImage> ReturnImages => Set<ReturnImage>();
+        public DbSet<OrderStatusLog> OrderStatusLogs => Set<OrderStatusLog>();
+        public DbSet<StockLog> StockLogs => Set<StockLog>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -76,7 +93,7 @@ namespace EComAPI.Infrastructure.Common.Persistence.Context
         private void SetAuditFields()
         {
             var currentUserId = GetCurrentUserId();
-            var now = DateTime.UtcNow;
+            var now = JakartaTime.Now;
 
             var auditableEntries = ChangeTracker.Entries<AuditableEntity>();
 

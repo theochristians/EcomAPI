@@ -1,10 +1,10 @@
 ﻿using EComAPI.Application.Categories.Interfaces;
 using EComAPI.Application.Common.Interfaces;
 using EComAPI.Application.Common.Interfaces.Identity;
-using EComAPI.Application.Common.Results;
+using EComAPI.Application.Common.Result;
 using EComAPI.Domain.Common.Exceptions;
 
-namespace EComAPI.Application.Categories.Commands.DeleteCategory
+namespace EComAPI.Application.Categories.Commands.DeleteCategories
 {
     public class DeleteCategoryHandler
     {
@@ -23,7 +23,7 @@ namespace EComAPI.Application.Categories.Commands.DeleteCategory
         }
 
         public async Task<Result<Guid>> Handle(
-            DeleteCategoriesCommand deleteCategoriesCommand,
+            DeleteCategoryCommand deleteCategoriesCommand,
             CancellationToken cancellationToken = default)
         {
             try

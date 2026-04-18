@@ -34,7 +34,8 @@ namespace EComAPI.Infrastructure.Products.Persistence.Configurations
 
             entityTypeBuilder.Property(productVariant => productVariant.Stock)
                 .HasDefaultValue(0)
-                .IsRequired();
+                .IsRequired()
+                .IsConcurrencyToken();
 
             entityTypeBuilder.Property(productVariant => productVariant.IsActive)
                 .HasDefaultValue(true)

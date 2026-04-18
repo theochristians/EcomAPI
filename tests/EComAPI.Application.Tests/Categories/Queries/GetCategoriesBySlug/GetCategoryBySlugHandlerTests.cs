@@ -1,5 +1,6 @@
 using EComAPI.Application.Categories.Interfaces;
 using EComAPI.Application.Categories.Queries.GetCategoriesBySlug;
+using EComAPI.Application.Common.Interfaces;
 using EComAPI.Domain.Categories.Entities;
 using FluentAssertions;
 using Moq;
@@ -10,6 +11,7 @@ namespace EComAPI.Application.Tests.Categories.Queries.GetCategoriesBySlug
     public class GetCategoryBySlugHandlerTests
     {
         private readonly Mock<ICategoryRepository> _mockCategoryRepository;
+        private readonly Mock<ICacheService> _mockCacheService;
         private readonly GetCategoryBySlugHandler _getCategoryBySlugHandler;
 
         private readonly Guid _userId = Guid.NewGuid();
@@ -17,9 +19,19 @@ namespace EComAPI.Application.Tests.Categories.Queries.GetCategoriesBySlug
         public GetCategoryBySlugHandlerTests()
         {
             _mockCategoryRepository = new Mock<ICategoryRepository>();
+            _mockCacheService = new Mock<ICacheService>();
+
+            _mockCacheService
+                .Setup(x => x.GetNamespaceVersionsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new Dictionary<string, long>
+                {
+                    ["categories"] = 1,
+                    ["products"] = 1
+                });
 
             _getCategoryBySlugHandler = new GetCategoryBySlugHandler(
-                _mockCategoryRepository.Object
+                _mockCategoryRepository.Object,
+                _mockCacheService.Object
             );
         }
 

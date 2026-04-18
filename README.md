@@ -1,276 +1,219 @@
-# PatternNET – .NET 8 Clean Architecture Template
+﻿# EComAPI
 
-PatternNET adalah **starter template** untuk membangun aplikasi backend .NET 8 yang **scalable, modular, dan mudah di‑maintain** menggunakan prinsip **Domain‑Driven Design (DDD)** dan **Clean Architecture**.
+Backend API e-commerce berbasis .NET 8 dengan Clean Architecture.
 
-Template ini dirancang agar:
+## Arsitektur
 
-* aturan bisnis (Domain) **terpisah total** dari detail teknis (DB, framework),
-* struktur konsisten dan mudah di‑copy untuk project berikutnya,
-* siap dikembangkan menjadi **Microservices** bila dibutuhkan.
+Solusi ini dipisah menjadi layer berikut:
 
----
+- `EComAPI.Domain`: entity, value object, dan aturan bisnis.
+- `EComAPI.Application`: use case (commands/queries), contract interface, validasi alur aplikasi.
+- `EComAPI.Infrastructure`: implementasi teknis (EF Core, repository, caching, security).
+- `EComAPI.API`: HTTP API, auth/authorization middleware, Swagger, rate limiting.
+- `tests/EComAPI.Application.Tests`: unit tests application layer.
+- `tests/EComAPI.API.Tests`: integration tests API layer.
 
-## 🚀 Teknologi Utama
+## Fitur Utama
 
-* **Framework**: .NET 8 (LTS)
-* **Language**: C# 12
-* **Database**: Entity Framework Core 8 (SQL Server)
-* **Architecture**: Clean Architecture + DDD
-* **Pattern**: CQRS (Command & Query Separation)
-* **Validation**: Domain Validation (Entity & Value Object)
-* **Dependency Injection**: Native .NET DI
-* **API Docs**: Swagger / OpenAPI
+- JWT auth: register, login, refresh token, logout.
+- Email verification OTP (public send/verify) dan login hanya untuk email terverifikasi.
+- Forgot password berbasis OTP (`forgot-password` + `reset-password`).
+- Token blacklist dengan audit DB + cache Redis/InMemory.
+- Permission-based authorization.
+- Modul user profile dan address.
+- Modul category dan product (termasuk variant/image).
+- Modul shopping: cart dan wishlist.
+- Modul transaction: order, coupon, review, return, order status log, stock log.
+- Rate limiting untuk endpoint auth dan email verification.
 
----
+## Prasyarat
 
-## 📂 Struktur Arsitektur
+- .NET SDK 8.x
+- SQL Server (Express/Developer/Azure SQL boleh)
 
-> **Dependency Rule**
-> Layer bagian dalam **tidak boleh bergantung** pada layer luar.
+## Menjalankan Project
 
-```
-src
-└─ Modules
-   └─ PatternNET
-      ├─ PatternNET.Domain
-      ├─ PatternNET.Application
-      ├─ PatternNET.Infrastructure
-      └─ PatternNET.API
-```
+1. Restore dependencies:
 
----
-
-## 1️⃣ PatternNET.Domain – Jantung Aplikasi ❤️
-
-Layer terdalam. **Tidak bergantung pada project lain**.
-Hanya berisi aturan bisnis murni.
-
-```
-PatternNET.Domain
-├─ Entities        # Objek bisnis utama (punya identitas)
-├─ ValueObjects    # Nilai penting tanpa identitas
-├─ Events          # Domain Events (opsional)
-└─ Exceptions      # Error khusus bisnis
+```powershell
+dotnet restore
 ```
 
-**Aturan penting:**
+2. Update database dari migration yang sudah ada:
 
-* ❌ Tidak boleh ada EF Core
-* ❌ Tidak boleh ada HTTP / Controller
-* ❌ Tidak boleh ada LINQ ke DB
-
-**Contoh isi:**
-
-* `ContactMessage.cs`
-* `Email.cs`
-* `DomainException.cs`
-
----
-
-## 2️⃣ PatternNET.Application – Otak Aplikasi 🧠
-
-Mengatur **alur kerja (use case)**.
-Bergantung **hanya pada Domain**.
-
-```
-PatternNET.Application
-├─ UseCases
-│  ├─ Commands      # Aksi tulis (Create, Update, Delete)
-│  └─ Queries       # Aksi baca (Get, List)
-├─ Interfaces       # Kontrak Repository
-└─ DependencyInjection.cs
+```powershell
+dotnet ef database update --project EComAPI.Infrastructure --startup-project EComAPI.API
 ```
 
-**Aturan penting:**
+3. Run API:
 
-* ✔ Mengatur urutan proses
-* ✔ Memanggil Domain
-* ✔ Memanggil Repository (via interface)
-* ❌ Tidak ada EF Core / SQL
-
----
-
-## 3️⃣ PatternNET.Infrastructure – Gudang & Alat 🏭
-
-Berisi **implementasi teknis**.
-Bergantung pada Domain & Application.
-
-```
-PatternNET.Infrastructure
-├─ Persistence
-│  ├─ Configurations   # Mapping Entity → Table (Fluent API)
-│  ├─ Repositories     # Implementasi IRepository
-│  └─ AppDbContext.cs
-├─ Migrations          # Versi perubahan struktur DB
-└─ DependencyInjection.cs
+```powershell
+dotnet run --project EComAPI.API
 ```
 
-**Aturan penting:**
+4. Buka Swagger:
 
-* ✔ EF Core di sini
-* ✔ LINQ ke DB di sini
-* ❌ Tidak ada aturan bisnis
+- `http://localhost:5006/swagger`
+- `https://localhost:7091/swagger`
 
----
+## Konfigurasi Penting
 
-## 4️⃣ PatternNET.API – Pintu Depan 🚪
+### Secret Manager / Environment Variables (Recommended)
 
-Entry point aplikasi.
-Menangani HTTP Request & Response.
+Jangan simpan credential production di `appsettings*.json`.
+Gunakan:
 
-```
-PatternNET.API
-├─ Controllers     # Endpoint HTTP
-├─ Dtos
-│  ├─ Requests     # Input JSON
-│  └─ Responses    # Output JSON
-└─ Program.cs      # Startup & konfigurasi
-```
+1. `dotnet user-secrets` untuk local development.
+2. Environment variable / CI secret manager untuk staging & production.
 
-**Aturan penting:**
+Project API sudah diaktifkan `UserSecretsId` agar bisa langsung pakai user-secrets.
 
-* ✔ Mapping DTO → Command
-* ✔ Panggil UseCase
-* ❌ Tidak ada query DB
-* ❌ Tidak ada aturan bisnis
+Contoh set local secret:
 
----
-
-## 🔁 Alur Request (Flow Standar)
-
-```
-Client
- ↓
-API (Controller)
- ↓
-Application (UseCase)
- ↓
-Domain (Validasi & Aturan)
- ↓
-Infrastructure (EF Core / DB)
- ↓
-Database
- ↓
-Response kembali ke API
+```powershell
+dotnet user-secrets --project EComAPI.API set "ConnectionStrings:SQLServerECom" "Server=.;Database=EComDb;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=True;"
+dotnet user-secrets --project EComAPI.API set "JwtSettings:Secret" "<JWT_SECRET>"
+dotnet user-secrets --project EComAPI.API set "AzureBlobStorage:Enabled" "true"
+dotnet user-secrets --project EComAPI.API set "AzureBlobStorage:AccountName" "<STORAGE_ACCOUNT>"
+dotnet user-secrets --project EComAPI.API set "AzureBlobStorage:ContainerName" "<CONTAINER>"
+dotnet user-secrets --project EComAPI.API set "AzureBlobStorage:TenantId" "<TENANT_ID>"
+dotnet user-secrets --project EComAPI.API set "AzureBlobStorage:ClientId" "<CLIENT_ID>"
+dotnet user-secrets --project EComAPI.API set "AzureBlobStorage:ClientSecret" "<CLIENT_SECRET>"
 ```
 
----
+Contoh set environment variable (PowerShell):
 
-## 🛠️ Prasyarat (Requirements)
-
-* .NET 8 SDK
-* SQL Server / SQL Server Express / LocalDB
-* Visual Studio 2022 atau VS Code
-* Git
-
----
-
-## ⚡ Cara Menjalankan (Getting Started)
-
-### 1. Clone Repository
-
-```
-git clone https://github.com/USERNAME/PatternNET.git
-cd PatternNET
+```powershell
+$env:ConnectionStrings__SQLServerECom = "<CONNECTION_STRING>"
+$env:JwtSettings__Secret = "<JWT_SECRET>"
+$env:AzureBlobStorage__Enabled = "true"
+$env:AzureBlobStorage__AccountName = "<STORAGE_ACCOUNT>"
+$env:AzureBlobStorage__ContainerName = "<CONTAINER>"
+$env:AzureBlobStorage__TenantId = "<TENANT_ID>"
+$env:AzureBlobStorage__ClientId = "<CLIENT_ID>"
+$env:AzureBlobStorage__ClientSecret = "<CLIENT_SECRET>"
 ```
 
----
+Template key lengkap tersedia di:
 
-### 2. Konfigurasi Database
+- [.env.example](.env.example)
 
-Edit file:
+### Database
 
+- Connection string key: `ConnectionStrings:SQLServerECom`
+
+### JWT
+
+- `JwtSettings:Secret`
+- `JwtSettings:Issuer`
+- `JwtSettings:Audience`
+- `JwtSettings:ExpiryMinutes`
+
+### Token Blacklist
+
+- `TokenBlacklist:FallbackMinutes`
+- `TokenBlacklist:MaxMinutes`
+- `TokenBlacklist:CleanupIntervalMinutes`
+
+### Redis (Upstash REST)
+
+Bisa pakai config file atau env var:
+
+- `Redis:Enabled`
+- `Redis:Url`
+- `Redis:Token`
+- `Redis:InstanceName`
+- `REDIS_URL` (env)
+- `REDIS_TOKEN` (env)
+
+Jika Redis tidak aktif/credential kosong, service fallback ke in-memory cache.
+
+### Email (Brevo SMTP)
+
+OTP email verification akan dikirim melalui Brevo SMTP jika konfigurasi valid.
+Jika tidak valid/nonaktif, service fallback ke `ConsoleEmailSender`.
+
+- `Email:Enabled`
+- `Email:SmtpHost` (default: `smtp-relay.brevo.com`)
+- `Email:SmtpPort` (default: `587`)
+- `Email:SmtpUsername`
+- `Email:SmtpPassword`
+- `Email:FromEmail`
+- `Email:FromName`
+- `Email:BrandName` (default: `Thrifties`)
+- `Email:BrandDomain` (default: `thrifties.app`)
+- `Email:LogoUrl` (opsional, URL HTTPS logo brand)
+- `Email:EnableSsl`
+
+Env var yang didukung:
+
+- `EMAIL_ENABLED`
+- `EMAIL_SMTP_HOST`
+- `EMAIL_SMTP_PORT`
+- `EMAIL_SMTP_USERNAME`
+- `EMAIL_SMTP_PASSWORD`
+- `EMAIL_FROM_EMAIL`
+- `EMAIL_FROM_NAME`
+- `EMAIL_BRAND_NAME`
+- `EMAIL_BRAND_DOMAIN`
+- `EMAIL_LOGO_URL`
+- `EMAIL_ENABLE_SSL`
+
+### Azure Blob Storage (SAS Upload)
+
+Fitur ini dipakai untuk direct upload dari frontend ke Azure Blob (backend hanya generate SAS).
+
+- `AzureBlobStorage:Enabled`
+- `AzureBlobStorage:AccountName`
+- `AzureBlobStorage:ContainerName`
+- `AzureBlobStorage:TenantId`
+- `AzureBlobStorage:ClientId`
+- `AzureBlobStorage:ClientSecret`
+
+Env var yang didukung:
+
+- `AZURE_STORAGE_ACCOUNT_NAME`
+- `AZURE_STORAGE_CONTAINER`
+- `AZURE_TENANT_ID`
+- `AZURE_CLIENT_ID`
+- `AZURE_CLIENT_SECRET`
+
+## Seeder Default
+
+Saat startup, API hanya menjalankan seeder role/permission.
+
+## Testing
+
+Jalankan semua test:
+
+```powershell
+dotnet test
 ```
-src/Modules/PatternNET/PatternNET.API/appsettings.json
+
+Jalankan per test project:
+
+```powershell
+dotnet test tests/EComAPI.Application.Tests/EComAPI.Application.Tests.csproj
+dotnet test tests/EComAPI.API.Tests/EComAPI.API.Tests.csproj
 ```
 
-Contoh:
+Dokumentasi test detail ada di [tests/README.md](tests/README.md).
 
-```json
-"ConnectionStrings": {
-  "DefaultConnection": "Server=localhost;Database=PatternNET_Db;Trusted_Connection=True;TrustServerCertificate=True;"
-}
-```
+## Manual Demo / Smoke Flow
 
----
+Flow manual end-to-end ada di:
 
-### 3. Jalankan Migration (Wajib)
+- [EComAPI.API/LIVE_DEMO_TESTING.md](EComAPI.API/LIVE_DEMO_TESTING.md)
 
-Karena **Infrastructure terpisah dari API**, perintah migration harus eksplisit:
+Dokumen tersebut berisi urutan test manual Auth -> Catalog -> Cart/Order -> Review/Return -> Refresh/Logout.
 
-```
-dotnet ef migrations add InitialCreate \
-  --project PatternNET.Infrastructure \
-  --startup-project PatternNET.API
+## Timezone Policy
 
+Aturan penggunaan waktu Jakarta vs UTC ada di:
 
-dotnet ef database update \
-  --project PatternNET.Infrastructure \
-  --startup-project PatternNET.API
-```
+- [TIME_POLICY.md](TIME_POLICY.md)
 
----
+## Catatan Deployment
 
-### 4. Jalankan Aplikasi
-
-```
-dotnet run --project PatternNET.API
-```
-
-Akses Swagger UI:
-
-```
-https://localhost:7XXX/swagger/index.html
-```
-
----
-
-## 🧑‍💻 Panduan Pengembangan Fitur Baru
-
-Gunakan prinsip **dari dalam ke luar**.
-
-### Contoh: Menambah Fitur "Create Product"
-
-**1. Domain**
-
-* Buat `Product.cs` (Entity)
-* Tambahkan validasi di constructor
-
-**2. Application**
-
-* Buat `IProductRepository`
-* Buat `CreateProductCommand` & `CreateProductHandler`
-
-**3. Infrastructure**
-
-* Buat konfigurasi EF Core
-* Implementasi `ProductRepository`
-* Jalankan migration
-
-**4. API**
-
-* Buat `CreateProductRequest`
-* Buat `ProductController`
-
----
-
-## 🧭 Aturan Emas Penempatan Kode
-
-| Jika menulis…   | Taruh di       |
-| --------------- | -------------- |
-| Aturan bisnis   | Domain         |
-| Urutan proses   | Application    |
-| EF / LINQ / SQL | Infrastructure |
-| HTTP / JSON     | API            |
-
----
-
-## 🤝 Kontribusi
-
-Silakan fork repository ini dan buat Pull Request jika ingin mengembangkan template.
-
----
-
-## 📄 Lisensi
-
-Template ini menggunakan **MIT License**.
+- Jangan deploy dari worktree yang masih banyak perubahan campuran.
+- Simpan secret production di environment variable atau secret manager, bukan hardcoded di `appsettings`.

@@ -39,11 +39,11 @@ namespace EComAPI.API.Categories.Controllers
     public class CategoryController : BaseController
     {
         private readonly CreateCategoryHandler _createCategoriesHandler;
-        private readonly GetCategoryHandler _getCategoriesHandler;
+        private readonly GetCategoriesHandler _getCategoriesHandler;
         private readonly GetCategoryBySlugHandler _getCategoriesBySlugHandler;
         private readonly UpdateCategoryHandler _updateCategoriesHandler;
         private readonly DeleteCategoryHandler _deleteCategoriesHandler;
-        private readonly RestoreCategoryHandler _restoreCategoriesHandler;
+        private readonly RestoreCategoriesHandler _restoreCategoriesHandler;
 
         /// <summary>
         /// Inisialisasi CategoryController dengan seluruh handler kategori.
@@ -56,11 +56,11 @@ namespace EComAPI.API.Categories.Controllers
         /// <param name="restoreCategoriesHandler">Handler untuk restore kategori yang terhapus.</param>
         public CategoryController(
             CreateCategoryHandler createCategoriesHandler,
-            GetCategoryHandler getCategoriesHandler,
+            GetCategoriesHandler getCategoriesHandler,
             GetCategoryBySlugHandler getCategoriesBySlugHandler,
             UpdateCategoryHandler updateCategoriesHandler,
             DeleteCategoryHandler deleteCategoriesHandler,
-            RestoreCategoryHandler restoreCategoriesHandler)
+            RestoreCategoriesHandler restoreCategoriesHandler)
         {
             _createCategoriesHandler = createCategoriesHandler;
             _getCategoriesHandler = getCategoriesHandler;
@@ -93,7 +93,7 @@ namespace EComAPI.API.Categories.Controllers
         public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
         {
             // Step 1: Ambil daftar kategori.
-            var getCategoriesResult = await _getCategoriesHandler.Handle(cancellationToken);
+            var getCategoriesResult = await _getCategoriesHandler.Handle(new GetCategoriesQuery(), cancellationToken);
 
             // Step 2: Jika gagal, kirim response error.
             if (!getCategoriesResult.IsSuccess)
@@ -263,7 +263,7 @@ namespace EComAPI.API.Categories.Controllers
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
         [SwaggerRequestExample(typeof(UpdateCategoryRequest), typeof(UpdateCategoryRequestExample))]
-        [SwaggerResponseExample(StatusCodes.Status200OK, typeof(UpdateCategorySuccessExample))]
+        [SwaggerResponseExample(StatusCodes.Status200OK, typeof(UpdateCategoriesSuccessExample))]
         [SwaggerResponseExample(StatusCodes.Status400BadRequest, typeof(UpdateCategoryBadRequestExample))]
         [SwaggerResponseExample(StatusCodes.Status401Unauthorized, typeof(UnauthorizedExample))]
         [SwaggerResponseExample(StatusCodes.Status403Forbidden, typeof(ForbiddenExample))]

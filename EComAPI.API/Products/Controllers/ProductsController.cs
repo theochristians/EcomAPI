@@ -44,6 +44,7 @@ using EComAPI.Application.Products.Commands.ProductVariantCommands.AddProductVar
 using EComAPI.Application.Products.Commands.ProductVariantCommands.RemoveProductVariant;
 using EComAPI.Application.Products.Commands.ProductVariantCommands.RestoreProductVariant;
 using EComAPI.Application.Products.Commands.ProductVariantCommands.UpdateProductVariant;
+using EComAPI.Application.Products.DTOs;
 using EComAPI.Application.Products.Queries.GetProductBySlug;
 using EComAPI.Application.Products.Queries.GetProducts;
 
@@ -218,7 +219,17 @@ namespace EComAPI.API.Products.Controllers
             var (items, totalCount, _) = result.Value;
 
             var productListResponses = items
-                .Select(ProductListResponse.FromDto)
+                .Select(productListDto => new ProductListResponse(
+                    productListDto.Id,
+                    productListDto.Name,
+                    productListDto.Slug,
+                    productListDto.BasePrice,
+                    productListDto.ViewCount,
+                    productListDto.IsActive,
+                    productListDto.HasStock,
+                    productListDto.TotalStock,
+                    productListDto.Category != null ? MapCategoryHierarchy(productListDto.Category) : null
+                ))
                 .ToList();
 
             var baseUrl = $"{Request.Scheme}://{Request.Host}{Request.Path}";
@@ -284,7 +295,34 @@ namespace EComAPI.API.Products.Controllers
                 new RecordProductViewCommand(getProductBySlugResult.Value!.Id),
                 cancellationToken);
 
-            var productDetailResponse = ProductDetailResponse.FromDto(getProductBySlugResult.Value!);
+            var productDetailDto = getProductBySlugResult.Value!;
+            var productDetailResponse = new ProductDetailResponse(
+                productDetailDto.Id,
+                productDetailDto.Name,
+                productDetailDto.Slug,
+                productDetailDto.BasePrice,
+                productDetailDto.Description,
+                productDetailDto.ViewCount,
+                productDetailDto.TotalStock,
+                productDetailDto.IsActive,
+                productDetailDto.Category != null ? MapCategoryHierarchy(productDetailDto.Category) : null,
+                productDetailDto.Variants.Select(ProductVariantDto => new ProductVariantResponse(
+                    ProductVariantDto.Id,
+                    ProductVariantDto.Sku,
+                    ProductVariantDto.Stock,
+                    ProductVariantDto.PriceAdjustment,
+                    ProductVariantDto.FinalPrice,
+                    ProductVariantDto.Size,
+                    ProductVariantDto.Color,
+                    ProductVariantDto.IsActive
+                )).ToList(),
+                productDetailDto.Images.Select(ProductImageDto => new ProductImageResponse(
+                    ProductImageDto.Id,
+                    ProductImageDto.ImageUrl,
+                    ProductImageDto.IsPrimary,
+                    ProductImageDto.DisplayOrder
+                )).ToList()
+            );
 
             return SuccessResponse(productDetailResponse, "Success get product");
         }
@@ -378,7 +416,7 @@ namespace EComAPI.API.Products.Controllers
             UpdateProductRequest updateProductRequest,
             CancellationToken cancellationToken)
         {
-            var command = new UpdateProductCommand(
+            var updateProductCommand = new UpdateProductCommand(
                 id,
                 updateProductRequest.Name,
                 updateProductRequest.Slug,
@@ -387,18 +425,18 @@ namespace EComAPI.API.Products.Controllers
                 updateProductRequest.Description
             );
 
-            var result = await _updateProductHandler.Handle(command, cancellationToken);
+            var updateProductResult = await _updateProductHandler.Handle(updateProductCommand, cancellationToken);
 
-            if (!result.IsSuccess)
+            if (!updateProductResult.IsSuccess)
             {
-                if (IsProductNotFound(result.Error))
-                    return NotFoundResponse(result.Error!);
+                if (IsProductNotFound(updateProductResult.Error))
+                    return NotFoundResponse(updateProductResult.Error!);
 
-                return BadRequestResponse(result.Error ?? "Update product failed");
+                return BadRequestResponse(updateProductResult.Error ?? "Update product failed");
             }
 
             return SuccessResponse(
-                new { productId = result.Value },
+                new { productId = updateProductResult.Value },
                 "Product updated successfully"
             );
         }
@@ -435,19 +473,19 @@ namespace EComAPI.API.Products.Controllers
             Guid id,
             CancellationToken cancellationToken = default)
         {
-            var command = new DeactivateProductCommand(id);
-            var result = await _deactivateProductHandler.Handle(command, cancellationToken);
+            var deactivateProductCommand = new DeactivateProductCommand(id);
+            var deactiveProductResult = await _deactivateProductHandler.Handle(deactivateProductCommand, cancellationToken);
 
-            if (!result.IsSuccess)
+            if (!deactiveProductResult.IsSuccess)
             {
-                if (IsProductNotFound(result.Error))
-                    return NotFoundResponse(result.Error!);
+                if (IsProductNotFound(deactiveProductResult.Error))
+                    return NotFoundResponse(deactiveProductResult.Error!);
 
-                return BadRequestResponse(result.Error ?? "Deactivate product failed");
+                return BadRequestResponse(deactiveProductResult.Error ?? "Deactivate product failed");
             }
 
             return SuccessResponse(
-                new { productId = result.Value },
+                new { productId = deactiveProductResult.Value },
                 "Product deactivated successfully"
             );
         }
@@ -484,19 +522,19 @@ namespace EComAPI.API.Products.Controllers
             Guid id,
             CancellationToken cancellationToken = default)
         {
-            var command = new ActivateProductCommand(id);
-            var result = await _activateProductHandler.Handle(command, cancellationToken);
+            var activateProductCommand = new ActivateProductCommand(id);
+            var activateProductResult = await _activateProductHandler.Handle(activateProductCommand, cancellationToken);
 
-            if (!result.IsSuccess)
+            if (!activateProductResult.IsSuccess)
             {
-                if (IsProductNotFound(result.Error))
-                    return NotFoundResponse(result.Error!);
+                if (IsProductNotFound(activateProductResult.Error))
+                    return NotFoundResponse(activateProductResult.Error!);
 
-                return BadRequestResponse(result.Error ?? "Activate product failed");
+                return BadRequestResponse(activateProductResult.Error ?? "Activate product failed");
             }
 
             return SuccessResponse(
-                new { productId = result.Value },
+                new { productId = activateProductResult.Value },
                 "Product activated successfully"
             );
         }
@@ -681,7 +719,7 @@ namespace EComAPI.API.Products.Controllers
         /// 6. Jika berhasil, kembalikan variantId.
         /// </remarks>
         /// <param name="id">Id varian yang akan diperbarui.</param>
-        /// <param name="request">Payload perubahan data varian.</param>
+        /// <param name="updateProductVariantRequest">Payload perubahan data varian.</param>
         /// <param name="cancellationToken">Token pembatalan request async.</param>
         /// <returns>ApiResponse status pembaruan varian.</returns>
         [HttpPatch("variants/{id}")]
@@ -699,30 +737,30 @@ namespace EComAPI.API.Products.Controllers
         [SwaggerResponseExample(StatusCodes.Status404NotFound, typeof(VariantNotFoundExample))]
         public async Task<IActionResult> UpdateVariant(
             Guid id,
-            UpdateProductVariantRequest request,
+            UpdateProductVariantRequest updateProductVariantRequest,
             CancellationToken cancellationToken)
         {
-            var command = new UpdateProductVariantCommand(
+            var updateProductVariantCommand = new UpdateProductVariantCommand(
                 id,
-                request.Size,
-                request.Color,
-                request.PriceAdjustment,
-                request.Sku,
-                request.Stock
+                updateProductVariantRequest.Size,
+                updateProductVariantRequest.Color,
+                updateProductVariantRequest.PriceAdjustment,
+                updateProductVariantRequest.Sku,
+                updateProductVariantRequest.Stock
             );
 
-            var result = await _updateProductVariantHandler.Handle(command, cancellationToken);
+            var updateProductVariantResult = await _updateProductVariantHandler.Handle(updateProductVariantCommand, cancellationToken);
 
-            if (!result.IsSuccess)
+            if (!updateProductVariantResult.IsSuccess)
             {
-                if (IsVariantNotFound(result.Error) || IsProductNotFound(result.Error))
-                    return NotFoundResponse(result.Error!);
+                if (IsVariantNotFound(updateProductVariantResult.Error) || IsProductNotFound(updateProductVariantResult.Error))
+                    return NotFoundResponse(updateProductVariantResult.Error!);
 
-                return BadRequestResponse(result.Error ?? "Update variant failed");
+                return BadRequestResponse(updateProductVariantResult.Error ?? "Update variant failed");
             }
 
             return SuccessResponse(
-                new { variantId = result.Value },
+                new { variantId = updateProductVariantResult.Value },
                 "Variant updated successfully"
             );
         }
@@ -760,19 +798,19 @@ namespace EComAPI.API.Products.Controllers
             Guid id,
             CancellationToken cancellationToken)
         {
-            var command = new RemoveProductVariantCommand(id);
-            var result = await _removeProductVariantHandler.Handle(command, cancellationToken);
+            var removeProductVariantCommand = new RemoveProductVariantCommand(id);
+            var removeProductVariantResult = await _removeProductVariantHandler.Handle(removeProductVariantCommand, cancellationToken);
 
-            if (!result.IsSuccess)
+            if (!removeProductVariantResult.IsSuccess)
             {
-                if (IsVariantNotFound(result.Error) || IsProductNotFound(result.Error))
-                    return NotFoundResponse(result.Error!);
+                if (IsVariantNotFound(removeProductVariantResult.Error) || IsProductNotFound(removeProductVariantResult.Error))
+                    return NotFoundResponse(removeProductVariantResult.Error!);
 
-                return BadRequestResponse(result.Error ?? "Remove variant failed");
+                return BadRequestResponse(removeProductVariantResult.Error ?? "Remove variant failed");
             }
 
             return SuccessResponse(
-                new { variantId = result.Value },
+                new { variantId = removeProductVariantResult.Value },
                 "Variant removed successfully"
             );
         }
@@ -810,19 +848,19 @@ namespace EComAPI.API.Products.Controllers
             Guid id,
             CancellationToken cancellationToken)
         {
-            var command = new RestoreProductVariantCommand(id);
-            var result = await _restoreProductVariantHandler.Handle(command, cancellationToken);
+            var restoreProductVariantCommand = new RestoreProductVariantCommand(id);
+            var restoreProductVariantResult = await _restoreProductVariantHandler.Handle(restoreProductVariantCommand, cancellationToken);
 
-            if (!result.IsSuccess)
+            if (!restoreProductVariantResult.IsSuccess)
             {
-                if (IsVariantNotFound(result.Error) || IsProductNotFound(result.Error))
-                    return NotFoundResponse(result.Error!);
+                if (IsVariantNotFound(restoreProductVariantResult.Error) || IsProductNotFound(restoreProductVariantResult.Error))
+                    return NotFoundResponse(restoreProductVariantResult.Error!);
 
-                return BadRequestResponse(result.Error ?? "Restore variant failed");
+                return BadRequestResponse(restoreProductVariantResult.Error ?? "Restore variant failed");
             }
 
             return SuccessResponse(
-                new { variantId = result.Value },
+                new { variantId = restoreProductVariantResult.Value },
                 "Variant restored successfully"
             );
         }
@@ -903,7 +941,7 @@ namespace EComAPI.API.Products.Controllers
         /// 6. Jika berhasil, kembalikan imageId.
         /// </remarks>
         /// <param name="id">Id gambar yang akan diperbarui.</param>
-        /// <param name="request">Payload perubahan data gambar.</param>
+        /// <param name="updateProductImageRequest">Payload perubahan data gambar.</param>
         /// <param name="cancellationToken">Token pembatalan request async.</param>
         /// <returns>ApiResponse status pembaruan gambar.</returns>
         [HttpPatch("images/{id}")]
@@ -921,28 +959,28 @@ namespace EComAPI.API.Products.Controllers
         [SwaggerResponseExample(StatusCodes.Status404NotFound, typeof(ImageNotFoundExample))]
         public async Task<IActionResult> UpdateImage(
             Guid id,
-            UpdateProductImageRequest request,
+            UpdateProductImageRequest updateProductImageRequest,
             CancellationToken cancellationToken)
         {
-            var command = new UpdateProductImageCommand(
+            var updateProductImageCommand = new UpdateProductImageCommand(
                 id,
-                request.ImageUrl,
-                request.IsPrimary,
-                request.DisplayOrder
+                updateProductImageRequest.ImageUrl,
+                updateProductImageRequest.IsPrimary,
+                updateProductImageRequest.DisplayOrder
             );
 
-            var result = await _updateProductImageHandler.Handle(command, cancellationToken);
+            var updateProductImageResult = await _updateProductImageHandler.Handle(updateProductImageCommand, cancellationToken);
 
-            if (!result.IsSuccess)
+            if (!updateProductImageResult.IsSuccess)
             {
-                if (IsImageNotFound(result.Error) || IsProductNotFound(result.Error))
-                    return NotFoundResponse(result.Error!);
+                if (IsImageNotFound(updateProductImageResult.Error) || IsProductNotFound(updateProductImageResult.Error))
+                    return NotFoundResponse(updateProductImageResult.Error!);
 
-                return BadRequestResponse(result.Error ?? "Update image failed");
+                return BadRequestResponse(updateProductImageResult.Error ?? "Update image failed");
             }
 
             return SuccessResponse(
-                new { imageId = result.Value },
+                new { imageId = updateProductImageResult.Value },
                 "Image updated successfully"
             );
         }
@@ -980,19 +1018,19 @@ namespace EComAPI.API.Products.Controllers
             Guid id,
             CancellationToken cancellationToken)
         {
-            var command = new RemoveProductImageCommand(id);
-            var result = await _removeProductImageHandler.Handle(command, cancellationToken);
+            var removeProductImageCommand = new RemoveProductImageCommand(id);
+            var removeProductImageResult = await _removeProductImageHandler.Handle(removeProductImageCommand, cancellationToken);
 
-            if (!result.IsSuccess)
+            if (!removeProductImageResult.IsSuccess)
             {
-                if (IsImageNotFound(result.Error) || IsProductNotFound(result.Error))
-                    return NotFoundResponse(result.Error!);
+                if (IsImageNotFound(removeProductImageResult.Error) || IsProductNotFound(removeProductImageResult.Error))
+                    return NotFoundResponse(removeProductImageResult.Error!);
 
-                return BadRequestResponse(result.Error ?? "Remove image failed");
+                return BadRequestResponse(removeProductImageResult.Error ?? "Remove image failed");
             }
 
             return SuccessResponse(
-                new { imageId = result.Value },
+                new { imageId = removeProductImageResult.Value },
                 "Image removed successfully"
             );
         }
@@ -1030,25 +1068,35 @@ namespace EComAPI.API.Products.Controllers
             Guid id,
             CancellationToken cancellationToken)
         {
-            var command = new RestoreProductImageCommand(id);
-            var result = await _restoreProductImageHandler.Handle(command, cancellationToken);
+            var restoreProductImageCommand = new RestoreProductImageCommand(id);
+            var restoreProductImageResult = await _restoreProductImageHandler.Handle(restoreProductImageCommand, cancellationToken);
 
-            if (!result.IsSuccess)
+            if (!restoreProductImageResult.IsSuccess)
             {
-                if (IsImageNotFound(result.Error))
-                    return NotFoundResponse(result.Error!);
+                if (IsImageNotFound(restoreProductImageResult.Error))
+                    return NotFoundResponse(restoreProductImageResult.Error!);
 
-                return BadRequestResponse(result.Error ?? "Restore image failed");
+                return BadRequestResponse(restoreProductImageResult.Error ?? "Restore image failed");
             }
 
             return SuccessResponse(
-                new { imageId = result.Value },
+                new { imageId = restoreProductImageResult.Value },
                 "Image restored successfully"
             );
         }
         #endregion
 
         #region Helper Methods
+        private static CategoryHierarchyResponse MapCategoryHierarchy(CategoryHierarchyDto categoryHierarchyDto)
+        {
+            return new CategoryHierarchyResponse(
+                categoryHierarchyDto.Id,
+                categoryHierarchyDto.Name,
+                categoryHierarchyDto.Slug,
+                categoryHierarchyDto.Parent != null ? MapCategoryHierarchy(categoryHierarchyDto.Parent) : null
+            );
+        }
+
         private static bool IsProductNotFound(string? error)
             => string.Equals(error, "Product not found", StringComparison.OrdinalIgnoreCase);
 

@@ -12,7 +12,7 @@ namespace EComAPI.Domain.Auth.Entities
         public DateTime ExpiresAt { get; private set; }
         public DateTime? UsedAt { get; private set; }
 
-        public bool IsExpired => DateTime.UtcNow >= ExpiresAt;
+        public bool IsExpired => SecurityTime.UtcNow >= ExpiresAt;
         public bool IsUsed => UsedAt.HasValue;
         public bool IsValid => !IsExpired && !IsUsed;
 
@@ -30,7 +30,7 @@ namespace EComAPI.Domain.Auth.Entities
             var tokenHashValue = Guard.AgainstNullOrWhiteSpace(tokenHash, "TokenHash is required");
             Guard.AgainstMaxLength(tokenHashValue, 500, "TokenHash cannot exceed 500 characters");
 
-            if (expiresAt <= DateTime.UtcNow)
+            if (expiresAt <= SecurityTime.UtcNow)
                 throw new DomainException("Expiration date must be in the future");
 
             UserId = userId;
@@ -50,7 +50,7 @@ namespace EComAPI.Domain.Auth.Entities
 
             Guard.AgainstEmptyGuid(updatedBy, "UpdatedBy is required");
 
-            UsedAt = DateTime.UtcNow;
+            UsedAt = SecurityTime.UtcNow;
             SetUpdated(updatedBy);
         }
     }

@@ -4,14 +4,11 @@ namespace EComAPI.Application.Auth.Interfaces
 {
     public interface IRefreshTokenRepository
     {
-        // =========================
         // QUERY (READ-ONLY)
-        // =========================
         Task<RefreshToken?> GetRefreshTokenAsync(string tokenHash, CancellationToken cancellationToken = default);
+        Task<List<RefreshToken>> GetActiveByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
-        // =========================
         // COMMAND (WRITE/PERSISTENCE)
-        // =========================
         Task AddRefreshTokenAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default);
         Task UpdateRefreshTokenAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default);
     }

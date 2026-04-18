@@ -57,6 +57,22 @@ namespace EComAPI.API.Tests.Auth
             email ??= $"usr_{Guid.NewGuid()}@test.com";
             await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest("Test User", email, password));
 
+            var sendResp = await _client.PostAsJsonAsync(
+                "/api/auth/email-verification/send",
+                new SendEmailVerificationByEmailRequest(email));
+            sendResp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            using (var scope = _factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var user = await db.Users.FirstAsync(x => x.Email.Value == email.ToLowerInvariant());
+                var otp = await GetLatestOtpCodeAsync(user.Id);
+                var verifyResp = await _client.PostAsJsonAsync(
+                    "/api/auth/email-verification/verify",
+                    new VerifyEmailByEmailRequest(email, otp));
+                verifyResp.StatusCode.Should().Be(HttpStatusCode.OK);
+            }
+
             var loginResponse = await _client.PostAsJsonAsync("/api/auth/login",
                 new LoginRequest(email, password, null));
 

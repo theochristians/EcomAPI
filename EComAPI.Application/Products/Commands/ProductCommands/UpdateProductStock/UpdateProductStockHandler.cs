@@ -2,22 +2,27 @@ using EComAPI.Application.Common.Interfaces;
 using EComAPI.Application.Common.Interfaces.Identity;
 using EComAPI.Application.Common.Result;
 using EComAPI.Application.Products.Interfaces;
+using EComAPI.Application.Transaction.Interfaces;
 using EComAPI.Domain.Common.Exceptions;
+using EComAPI.Domain.Transaction.Entities;
 
 namespace EComAPI.Application.Products.Commands.ProductCommands.UpdateProductStock
 {
     public class UpdateProductStockHandler
     {
         private readonly IProductRepository _productRepository;
+        private readonly IStockLogRepository _stockLogRepository;
         private readonly ICurrentUser _currentUser;
         private readonly IUnitOfWork _unitOfWork;
 
         public UpdateProductStockHandler(
             IProductRepository productRepository,
+            IStockLogRepository stockLogRepository,
             ICurrentUser currentUser,
             IUnitOfWork unitOfWork)
         {
             _productRepository = productRepository;
+            _stockLogRepository = stockLogRepository;
             _currentUser = currentUser;
             _unitOfWork = unitOfWork;
         }
@@ -49,7 +54,21 @@ namespace EComAPI.Application.Products.Commands.ProductCommands.UpdateProductSto
                 if (productWithVariants == null)
                     return Result<Guid>.Failure("Product not found");
 
+                var stockBefore = productVariantById.Stock;
+
                 productVariantById.SetStock(updateProductStockCommand.Stock, _currentUser.UserId);
+
+                var quantityChange = productVariantById.Stock - stockBefore;
+                var stockLog = new StockLog(
+                    productVariantId: productVariantById.Id,
+                    type: "adjustment",
+                    quantityChange: quantityChange,
+                    stockBefore: stockBefore,
+                    stockAfter: productVariantById.Stock,
+                    createdBy: _currentUser.UserId,
+                    note: $"Stock adjusted from {stockBefore} to {productVariantById.Stock}");
+
+                await _stockLogRepository.AddLogAsync(stockLog, cancellationToken);
 
                 productWithVariants.RecalculateTotalStock();
 

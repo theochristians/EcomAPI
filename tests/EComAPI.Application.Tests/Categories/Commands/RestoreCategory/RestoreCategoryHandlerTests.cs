@@ -14,7 +14,7 @@ namespace EComAPI.Application.Tests.Categories.Commands.RestoreCategory
         private readonly Mock<ICategoryRepository> _mockCategoryRepository;
         private readonly Mock<ICurrentUser> _mockCurrentUser;
         private readonly Mock<IUnitOfWork> _mockUnitOfWork;
-        private readonly RestoreCategoryHandler _restoreCategoryHandler;
+        private readonly RestoreCategoriesHandler _restoreCategoryHandler;
 
         private readonly Guid _userId = Guid.NewGuid();
 
@@ -24,7 +24,7 @@ namespace EComAPI.Application.Tests.Categories.Commands.RestoreCategory
             _mockCurrentUser = new Mock<ICurrentUser>();
             _mockUnitOfWork = new Mock<IUnitOfWork>();
 
-            _restoreCategoryHandler = new RestoreCategoryHandler(
+            _restoreCategoryHandler = new RestoreCategoriesHandler(
                 _mockCategoryRepository.Object,
                 _mockCurrentUser.Object,
                 _mockUnitOfWork.Object

@@ -46,5 +46,19 @@ namespace EComAPI.Infrastructure.Common.Identity
 
         public bool IsAuthenticated =>
             _httpContextAccessor.HttpContext?.User?.Identity?.IsAuthenticated ?? false;
+
+        public bool HasPermission(string permission)
+        {
+            if (string.IsNullOrWhiteSpace(permission))
+                return false;
+
+            var user = _httpContextAccessor.HttpContext?.User;
+            if (user?.Identity?.IsAuthenticated != true)
+                return false;
+
+            return user.Claims.Any(claim =>
+                claim.Type == "permission" &&
+                string.Equals(claim.Value, permission, StringComparison.Ordinal));
+        }
     }
 }

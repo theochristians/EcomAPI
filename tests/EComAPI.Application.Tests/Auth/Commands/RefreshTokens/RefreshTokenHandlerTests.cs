@@ -15,6 +15,7 @@ namespace EComAPI.Application.Tests.Auth.Commands.RefreshTokens
     {
         private readonly Mock<IRefreshTokenRepository> _mockRefreshTokenRepository;
         private readonly Mock<ITokenBlacklistRepository> _mockTokenBlacklistRepository;
+        private readonly Mock<ITokenBlacklistLifetimeProvider> _mockTokenBlacklistLifetimeProvider;
         private readonly Mock<IJwtTokenGenerator> _mockJwtTokenGenerator;
         private readonly Mock<ICurrentUser> _mockCurrentUser;
         private readonly Mock<IUnitOfWork> _mockUnitOfWork;
@@ -26,13 +27,18 @@ namespace EComAPI.Application.Tests.Auth.Commands.RefreshTokens
         {
             _mockRefreshTokenRepository    = new Mock<IRefreshTokenRepository>();
             _mockTokenBlacklistRepository  = new Mock<ITokenBlacklistRepository>();
+            _mockTokenBlacklistLifetimeProvider = new Mock<ITokenBlacklistLifetimeProvider>();
             _mockJwtTokenGenerator         = new Mock<IJwtTokenGenerator>();
             _mockCurrentUser               = new Mock<ICurrentUser>();
             _mockUnitOfWork                = new Mock<IUnitOfWork>();
 
+            _mockTokenBlacklistLifetimeProvider.SetupGet(x => x.FallbackLifetime).Returns(TimeSpan.FromMinutes(15));
+            _mockTokenBlacklistLifetimeProvider.SetupGet(x => x.MaxLifetime).Returns(TimeSpan.FromHours(24));
+
             _refreshTokenHandler = new RefreshTokenHandler(
                 _mockRefreshTokenRepository.Object,
                 _mockTokenBlacklistRepository.Object,
+                _mockTokenBlacklistLifetimeProvider.Object,
                 _mockJwtTokenGenerator.Object,
                 _mockCurrentUser.Object,
                 _mockUnitOfWork.Object

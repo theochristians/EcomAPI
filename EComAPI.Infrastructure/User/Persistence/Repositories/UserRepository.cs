@@ -13,89 +13,53 @@ namespace EComAPI.Infrastructure.Auth.Persistence.Repositories
         {
             _appDbContext = appDbContext;
         }
-
-        #region User Methods
-
-        public async Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+        
+        public async Task<User?> GetUserByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
             return await _appDbContext.Users
                 .Include(user => user.Role)
                 .FirstOrDefaultAsync(user => user.Id == id, cancellationToken);
         }
 
-        public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
+        public async Task<User?> GetUserByEmailAsync(string email, CancellationToken cancellationToken = default)
         {
             return await _appDbContext.Users
                 .Include(user => user.Role)
                 .FirstOrDefaultAsync(user => user.Email.Value == email, cancellationToken);
         }
 
-        public async Task<bool> ExistsAsync(string email, CancellationToken cancellationToken = default)
+        public async Task<bool> ExistsUserAsync(string email, CancellationToken cancellationToken = default)
         {
             return await _appDbContext.Users
                 .AnyAsync(user => user.Email.Value == email, cancellationToken);
         }
 
-        public async Task AddAsync(User user, CancellationToken cancellationToken = default)
+        public async Task AddUserAsync(User user, CancellationToken cancellationToken = default)
         {
             await _appDbContext.Users.AddAsync(user, cancellationToken);
         }
 
-        public Task UpdateAsync(User user, CancellationToken cancellationToken = default)
+        public Task UpdateUserAsync(User user, CancellationToken cancellationToken = default)
         {
-            _appDbContext.Users.Update(user);
+            var userEntry = _appDbContext.Entry(user);
+
+            // User fetched from this DbContext is already tracked.
+            // Avoid calling Update(user) because it marks the whole graph as Modified,
+            // including newly added LoginHistory entities that should be inserted.
+            if (userEntry.State == EntityState.Detached)
+            {
+                _appDbContext.Users.Attach(user);
+                userEntry = _appDbContext.Entry(user);
+                userEntry.State = EntityState.Modified;
+            }
+
             return Task.CompletedTask;
         }
 
-        public Task HardDeleteAsync(User user, CancellationToken cancellationToken = default)
+        public Task HardDeleteUserAsync(User user, CancellationToken cancellationToken = default)
         {
             _appDbContext.Users.Remove(user);
             return Task.CompletedTask;
         }
-
-        #endregion
-
-        #region RefreshToken Methods
-
-        public async Task AddRefreshTokenAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default)
-        {
-            await _appDbContext.RefreshTokens.AddAsync(refreshToken, cancellationToken);
-        }
-
-        public async Task<RefreshToken?> GetRefreshTokenAsync(string tokenHash, CancellationToken cancellationToken = default)
-        {
-            return await _appDbContext.RefreshTokens
-                .Include(refreshToken => refreshToken.User)
-                    .ThenInclude(user => user.Role)
-                .FirstOrDefaultAsync(refreshToken => refreshToken.TokenHash == tokenHash, cancellationToken);
-        }
-
-        public Task UpdateRefreshTokenAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default)
-        {
-            _appDbContext.RefreshTokens.Update(refreshToken);
-            return Task.CompletedTask;
-        }
-
-        public async Task RevokeAllUserRefreshTokensAsync(
-            Guid userId,
-            string reason,
-            Guid revokedBy,
-            CancellationToken cancellationToken = default)
-        {
-            // ⭐ FIX: Don't use IsExpired computed property
-            var now = DateTime.UtcNow;
-
-            var activeTokens = await _appDbContext.RefreshTokens
-                .Where(refreshToken => refreshToken.UserId == userId
-                                       && !refreshToken.RevokedAt.HasValue
-                                       && refreshToken.ExpiresAt > now) 
-                .ToListAsync(cancellationToken);
-
-            foreach (var token in activeTokens)
-            {
-                token.Revoke(reason, revokedBy);
-            }
-        }
-        #endregion
     }
 }

@@ -1,5 +1,4 @@
-﻿using EComAPI.Domain.Entities;
-using EComAPI.Domain.Auth.Enums;
+﻿using EComAPI.Domain.Auth.Enums;
 using EComAPI.Domain.Auth.ValueObjects;
 using EComAPI.Domain.Common.Base;
 using EComAPI.Domain.Common.Exceptions;
@@ -179,10 +178,10 @@ namespace EComAPI.Domain.Auth.Entities
             }
             if (dateOfBirth.HasValue)
             {
-                if (dateOfBirth.Value > DateTime.UtcNow)
+                if (dateOfBirth.Value > JakartaTime.Now)
                     throw new DomainException("Date of birth cannot be in the future");
 
-                var age = DateTime.UtcNow.Year - dateOfBirth.Value.Year;
+                var age = JakartaTime.Now.Year - dateOfBirth.Value.Year;
                 if (age < 13)
                     throw new DomainException("User must be at least 13 years old");
             }
@@ -211,6 +210,18 @@ namespace EComAPI.Domain.Auth.Entities
             SetUpdated(updatedBy);
         }
 
+        public void UpdatePassword(PasswordHash newPassword, Guid updatedBy)
+        {
+            if (newPassword == null)
+                throw new DomainException("Password is required");
+
+            if (updatedBy == Guid.Empty)
+                throw new DomainException("UpdatedBy is required");
+
+            Password = newPassword;
+            SetUpdated(updatedBy);
+        }
+
         public void VerifyEmail(Guid updatedBy)
         {
             if (IsEmailVerified)
@@ -223,9 +234,20 @@ namespace EComAPI.Domain.Auth.Entities
             SetUpdated(updatedBy);
         }
 
-        public void RecordLogin()
+        public void RecordLogin(string? ipAddress = null, string? userAgent = null, string? deviceName = null)
         {
-            LastLoginAt = DateTime.UtcNow;
+            LastLoginAt = JakartaTime.Now;
+
+            var loginHistory = new LoginHistory(
+                Id,
+                "Success",
+                Id,
+                null,
+                ipAddress,
+                userAgent,
+                deviceName);
+
+            _loginHistories.Add(loginHistory);
         }
     }
 }

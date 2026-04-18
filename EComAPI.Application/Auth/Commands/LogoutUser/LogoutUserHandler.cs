@@ -12,17 +12,20 @@ namespace EComAPI.Application.Auth.Commands.LogoutUser
     {
         private readonly IRefreshTokenRepository _refreshTokenRepository;
         private readonly ITokenBlacklistRepository _tokenBlacklistRepository;
+        private readonly ITokenBlacklistLifetimeProvider _tokenBlacklistLifetimeProvider;
         private readonly ICurrentUser _currentUser;
         private readonly IUnitOfWork _unitOfWork;
 
         public LogoutUserHandler(
             IRefreshTokenRepository refreshTokenRepository,
             ITokenBlacklistRepository tokenBlacklistRepository,
+            ITokenBlacklistLifetimeProvider tokenBlacklistLifetimeProvider,
             ICurrentUser currentUser,
             IUnitOfWork unitOfWork)
         {
             _refreshTokenRepository = refreshTokenRepository;
             _tokenBlacklistRepository = tokenBlacklistRepository;
+            _tokenBlacklistLifetimeProvider = tokenBlacklistLifetimeProvider;
             _currentUser = currentUser;
             _unitOfWork = unitOfWork;
         }
@@ -64,11 +67,16 @@ namespace EComAPI.Application.Auth.Commands.LogoutUser
 
                     if (!isTokenBlacklisted)
                     {
+                        var expiresAt = TokenHelper.ResolveAccessTokenExpiry(
+                            logoutUserCommand.AccessToken,
+                            _tokenBlacklistLifetimeProvider.FallbackLifetime,
+                            _tokenBlacklistLifetimeProvider.MaxLifetime);
+
                         var tokenBlacklist = new TokenBlacklist(
                             _currentUser.UserId,
                             accessTokenHash,
                             "User logged out",
-                            DateTime.UtcNow.AddMinutes(15),
+                            expiresAt,
                             _currentUser.UserId
                         );
 

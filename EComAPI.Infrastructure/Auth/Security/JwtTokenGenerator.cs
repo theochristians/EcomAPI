@@ -26,19 +26,16 @@ namespace EComAPI.Infrastructure.Auth.Security
 
         public async Task<string> GenerateTokenAsync(User user)
         {
-            // =========================
-            // BASE CLAIMS
-            // =========================
+            var issuedAt = SecurityTime.UtcNow;
+
             var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email.Value),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(issuedAt).ToString(), ClaimValueTypes.Integer64)
             };
 
-            // =========================
-            // ROLE CLAIM
-            // =========================
             var role = await _roleRepository.GetRoleByIdAsync(user.RoleId);
 
             if (role != null)
@@ -46,9 +43,6 @@ namespace EComAPI.Infrastructure.Auth.Security
                 claims.Add(new Claim(ClaimTypes.Role, role.Name));
             }
 
-            // =========================
-            // PERMISSION CLAIMS
-            // =========================
             var permissions = await _permissionRepository.GetPermissionByUserIdAsync(user.Id);
 
             foreach (var permission in permissions)
@@ -56,9 +50,6 @@ namespace EComAPI.Infrastructure.Auth.Security
                 claims.Add(new Claim("permission", permission.Name));
             }
 
-            // =========================
-            // SIGNING CREDENTIALS
-            // =========================
             var key = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(_jwtSettings.Secret));
 
@@ -66,14 +57,12 @@ namespace EComAPI.Infrastructure.Auth.Security
                 key,
                 SecurityAlgorithms.HmacSha256);
 
-            // =========================
-            // CREATE TOKEN
-            // =========================
             var token = new JwtSecurityToken(
                 issuer: _jwtSettings.Issuer,
                 audience: _jwtSettings.Audience,
                 claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes),
+                notBefore: issuedAt,
+                expires: SecurityTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes),
                 signingCredentials: creds
             );
 

@@ -1,19 +1,19 @@
 ﻿using EComAPI.Application.Categories.Interfaces;
 using EComAPI.Application.Common.Interfaces;
 using EComAPI.Application.Common.Interfaces.Identity;
-using EComAPI.Application.Common.Results;
+using EComAPI.Application.Common.Result;
 using EComAPI.Domain.Common.Exceptions;
 
-namespace EComAPI.Application.Categories.Commands.RestoreCategory
+namespace EComAPI.Application.Categories.Commands.RestoreCategories
 {
     public class RestoreCategoriesHandler
     {
-        private readonly ICategoriesRepository _categoriesRepository;
+        private readonly ICategoryRepository _categoriesRepository;
         private readonly ICurrentUser _currentUser;
         private readonly IUnitOfWork _unitOfWork;
 
         public RestoreCategoriesHandler(
-            ICategoriesRepository categoriesRepository,
+            ICategoryRepository categoriesRepository,
             ICurrentUser currentUser,
             IUnitOfWork unitOfWork)
         {

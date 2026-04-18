@@ -1,19 +1,19 @@
 ﻿using EComAPI.Application.Categories.Interfaces;
 using EComAPI.Application.Common.Interfaces;
 using EComAPI.Application.Common.Interfaces.Identity;
-using EComAPI.Application.Common.Results;
+using EComAPI.Application.Common.Result;
 using EComAPI.Domain.Common.Exceptions;
 
 namespace EComAPI.Application.Categories.Commands.UpdateCategories
 {
     public class UpdateCategoryHandler
     {
-        private readonly ICategoriesRepository _categoriesRepository;
+        private readonly ICategoryRepository _categoriesRepository;
         private readonly ICurrentUser _currentUser;
         private readonly IUnitOfWork _unitOfWork;
 
         public UpdateCategoryHandler(
-            ICategoriesRepository categoriesRepository,
+            ICategoryRepository categoriesRepository,
             ICurrentUser currentUser,
             IUnitOfWork unitOfWork)
         {
@@ -23,7 +23,7 @@ namespace EComAPI.Application.Categories.Commands.UpdateCategories
         }
 
         public async Task<Result<Guid>> Handle(
-            UpdateCategoriesCommand updateCategoriesCommand,
+            UpdateCategoryCommand updateCategoriesCommand,
             CancellationToken cancellationToken = default)
         {
             try
@@ -34,7 +34,7 @@ namespace EComAPI.Application.Categories.Commands.UpdateCategories
                 if (updateCategoriesCommand.Id == Guid.Empty)
                     return Result<Guid>.Failure("Category ID is required");
 
-                var getCategoriesByIdAsync = await _categoriesRepository.GetCategoriesByIdAsync(updateCategoriesCommand.Id, cancellationToken);
+                var getCategoriesByIdAsync = await _categoriesRepository.GetCategoryByIdAsync(updateCategoriesCommand.Id, cancellationToken);
 
                 if (getCategoriesByIdAsync is null)
                     return Result<Guid>.Failure("Category not found");
@@ -57,7 +57,7 @@ namespace EComAPI.Application.Categories.Commands.UpdateCategories
 
                 if (!string.IsNullOrWhiteSpace(updateCategoriesCommand.Slug) && updateCategoriesCommand.Slug != getCategoriesByIdAsync.Slug)
                 {
-                    var categoriesExistsBySlugAsync = await _categoriesRepository.CategoriesExistsBySlugAsync(
+                    var categoriesExistsBySlugAsync = await _categoriesRepository.CategoryExistsBySlugAsync(
                         updateCategoriesCommand.Slug,
                         cancellationToken);
 

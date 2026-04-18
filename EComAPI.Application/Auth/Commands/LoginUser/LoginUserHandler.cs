@@ -11,6 +11,7 @@ namespace EComAPI.Application.Auth.Commands.LoginUser
     public class LoginUserHandler
     {
         private readonly IUserRepository _userRepository;
+        private readonly ILoginHistoryRepository _loginHistoryRepository;
         private readonly IRefreshTokenRepository _refreshTokenRepository;
         private readonly IPasswordHasher _passwordHasher;
         private readonly IJwtTokenGenerator _jwtTokenGenerator;
@@ -18,12 +19,14 @@ namespace EComAPI.Application.Auth.Commands.LoginUser
 
         public LoginUserHandler(
             IUserRepository userRepository,
+            ILoginHistoryRepository loginHistoryRepository,
             IRefreshTokenRepository refreshTokenRepository,
             IPasswordHasher passwordHasher,
             IJwtTokenGenerator jwtTokenGenerator,
             IUnitOfWork unitOfWork)
         {
             _userRepository = userRepository;
+            _loginHistoryRepository = loginHistoryRepository;
             _refreshTokenRepository = refreshTokenRepository;
             _passwordHasher = passwordHasher;
             _jwtTokenGenerator = jwtTokenGenerator;
@@ -52,33 +55,44 @@ namespace EComAPI.Application.Auth.Commands.LoginUser
                 if (!userByEmail.IsActive)
                     return Result<LoginUserDto>.Failure("Account is deactivated");
 
+                if (!userByEmail.IsEmailVerified)
+                    return Result<LoginUserDto>.Failure("Email is not verified. Please verify your email before login");
+
                 if (!_passwordHasher.Verify(loginUserCommand.Password, userByEmail.Password.Value))
                     return Result<LoginUserDto>.Failure("Invalid credentials");
 
                 var accessToken = await _jwtTokenGenerator.GenerateTokenAsync(userByEmail);
+                var accessTokenExpiresAt = TokenHelper.ResolveAccessTokenExpiry(accessToken);
                 var refreshTokenString = TokenHelper.GenerateRefreshToken();
                 var refreshTokenHash = TokenHelper.HashToken(refreshTokenString);
 
                 var refreshToken = new RefreshTokenEntity(
                     userByEmail.Id,
                     refreshTokenHash,
-                    DateTime.UtcNow.AddDays(7),
+                    SecurityTime.UtcNow.AddDays(7),
                     userByEmail.Id,
                     loginUserCommand.IpAddress,
                     loginUserCommand.UserAgent,
                     loginUserCommand.DeviceName
                 );
 
-                userByEmail.RecordLogin(userByEmail.Id);
+                var loginHistory = new Domain.Auth.Entities.LoginHistory(
+                    userByEmail.Id,
+                    "Success",
+                    userByEmail.Id,
+                    null,
+                    loginUserCommand.IpAddress,
+                    loginUserCommand.UserAgent,
+                    loginUserCommand.DeviceName);
 
                 await _refreshTokenRepository.AddRefreshTokenAsync(refreshToken, cancellationToken);
-                await _userRepository.UpdateUserAsync(userByEmail, cancellationToken);
+                await _loginHistoryRepository.AddLoginHistoryAsync(loginHistory, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
 
                 return Result<LoginUserDto>.Success(new LoginUserDto(
                     accessToken,
                     refreshTokenString,
-                    DateTime.UtcNow.AddMinutes(15),
+                    accessTokenExpiresAt,
                     refreshToken.ExpiresAt));
             }
             catch (DomainException domainException)

@@ -16,6 +16,7 @@ using EComAPI.Application.Auth.Commands.DeleteOwnAccount;
 using EComAPI.Application.Auth.Commands.SendEmailVerification;
 using EComAPI.Application.Auth.Commands.VerifyEmail;
 using EComAPI.API.Auth.Dtos.Request;
+using EComAPI.API.Common.Time;
 
 namespace EComAPI.API.Auth.Controllers
 {
@@ -165,7 +166,7 @@ namespace EComAPI.API.Auth.Controllers
 
             // Step 4: Kembalikan response sukses + waktu kedaluwarsa.
             return SuccessResponse(
-                new { expiresAt = sendEmailVerificationResult.Value },
+                new { expiresAt = ApiTime.ToJakartaOffset(sendEmailVerificationResult.Value) },
                 "Verification code sent successfully");
         }
 

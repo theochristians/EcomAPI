@@ -1,5 +1,7 @@
-﻿using EComAPI.Application.Products.Interfaces;
+using EComAPI.Application.Common.Constants;
+using EComAPI.Application.Products.Interfaces;
 using EComAPI.Domain.Products.Entities;
+using EComAPI.Infrastructure.Common.Caching;
 using EComAPI.Infrastructure.Common.Persistence.Context;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,15 +10,17 @@ namespace EComAPI.Infrastructure.Products.Persistence.Repositories
     public class ProductRepository : IProductRepository
     {
         private readonly AppDbContext _appDbContext;
+        private readonly ICacheInvalidationBuffer _cacheInvalidationBuffer;
 
-        public ProductRepository(AppDbContext appDbContext)
+        public ProductRepository(
+            AppDbContext appDbContext,
+            ICacheInvalidationBuffer cacheInvalidationBuffer)
         {
             _appDbContext = appDbContext;
+            _cacheInvalidationBuffer = cacheInvalidationBuffer;
         }
 
-        // ==========================================
         // BASIC CRUD OPERATIONS - PRODUCT
-        // ==========================================
         public async Task<Product?> GetProductByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
             return await _appDbContext.Products
@@ -97,35 +101,33 @@ namespace EComAPI.Infrastructure.Products.Persistence.Repositories
                 .Where(product => product.Id == id)
                 .ExecuteUpdateAsync(update => update
                     .SetProperty(product => product.ViewCount, product => product.ViewCount + 1)
-                    .SetProperty(product => product.UpdatedAt, _ => DateTime.UtcNow),
+                    .SetProperty(product => product.UpdatedAt, _ => JakartaTime.Now),
                     cancellationToken);
 
+            // Tidak invalidasi cache untuk tiap view agar cache tidak thrashing.
             return affectedRows > 0;
         }
 
         public async Task AddProductAsync(Product product, CancellationToken cancellationToken = default)
         {
             await _appDbContext.Products.AddAsync(product, cancellationToken);
+            InvalidateProductCache();
         }
 
-        public Task UpdateProductAsync(Product product, CancellationToken cancellationToken = default)
+        public async Task UpdateProductAsync(Product product, CancellationToken cancellationToken = default)
         {
             _appDbContext.Products.Update(product);
-            return Task.CompletedTask;
+            InvalidateProductCache();
         }
 
-        // ==========================================
         // EXISTENCE CHECKS - PRODUCT
-        // ==========================================
         public async Task<bool> ProductExistsBySlugAsync(string slug, CancellationToken cancellationToken = default)
         {
             return await _appDbContext.Products
                 .AnyAsync(product => product.Slug == slug, cancellationToken);
         }
 
-        // ==========================================
         // SPECIALIZED BUSINESS QUERIES - PRODUCT
-        // ==========================================
         public async Task<(IReadOnlyList<Product> Items, int TotalCount)> GetProductsPaginatedAsync(
             List<Guid>? categoryIds,
             decimal? minPrice,
@@ -139,18 +141,15 @@ namespace EComAPI.Infrastructure.Products.Persistence.Repositories
             int pageSize,
             CancellationToken cancellationToken = default)
         {
-            // Start with base query
             var query = _appDbContext.Products
                 .Include(product => product.Variants)
                 .AsQueryable();
 
-            // Filter by categories
             if (categoryIds != null && categoryIds.Any())
             {
                 query = query.Where(product => categoryIds.Contains(product.CategoryId));
             }
 
-            // Filter by price range
             if (minPrice.HasValue)
             {
                 query = query.Where(product => product.BasePrice >= minPrice.Value);
@@ -161,7 +160,6 @@ namespace EComAPI.Infrastructure.Products.Persistence.Repositories
                 query = query.Where(product => product.BasePrice <= maxPrice.Value);
             }
 
-            // Filter by stock status
             if (inStock.HasValue)
             {
                 if (inStock.Value)
@@ -174,23 +172,19 @@ namespace EComAPI.Infrastructure.Products.Persistence.Repositories
                 }
             }
 
-            // Filter by active status
             if (isActive.HasValue)
             {
                 query = query.Where(product => product.IsActive == isActive.Value);
             }
 
-            // Search by name
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 var lowerSearchTerm = searchTerm.ToLower();
                 query = query.Where(product => product.Name.ToLower().Contains(lowerSearchTerm));
             }
 
-            // Get total count before pagination
             var totalCount = await query.CountAsync(cancellationToken);
 
-            // Apply sorting
             query = sortBy.ToLower() switch
             {
                 "name" => sortOrder.ToLower() == "asc"
@@ -210,14 +204,12 @@ namespace EComAPI.Infrastructure.Products.Persistence.Repositories
                     : query.OrderByDescending(product => product.CreatedAt)
             };
 
-            // Apply pagination
             var products = await query
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .AsNoTracking()
                 .ToListAsync(cancellationToken);
 
-            // Recalculate TotalStock for each product
             foreach (var product in products)
             {
                 product.RecalculateTotalStock();
@@ -226,9 +218,7 @@ namespace EComAPI.Infrastructure.Products.Persistence.Repositories
             return (products, totalCount);
         }
 
-        // ==========================================
         // BASIC CRUD OPERATIONS - PRODUCT VARIANT
-        // ==========================================
         public async Task<ProductVariant?> GetProductVariantByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
             return await _appDbContext.ProductVariants
@@ -242,20 +232,26 @@ namespace EComAPI.Infrastructure.Products.Persistence.Repositories
                 .FirstOrDefaultAsync(productVariant => productVariant.Id == id, cancellationToken);
         }
 
+        public async Task<ProductVariant?> GetProductVariantWithProductAsync(Guid id, CancellationToken cancellationToken = default)
+        {
+            return await _appDbContext.ProductVariants
+                .Include(pv => pv.Product)
+                .FirstOrDefaultAsync(pv => pv.Id == id, cancellationToken);
+        }
+
         public async Task AddProductVariantAsync(ProductVariant productVariant, CancellationToken cancellationToken = default)
         {
             await _appDbContext.ProductVariants.AddAsync(productVariant, cancellationToken);
+            InvalidateProductCache();
         }
 
-        public Task UpdateProductVariantAsync(ProductVariant productVariant, CancellationToken cancellationToken = default)
+        public async Task UpdateProductVariantAsync(ProductVariant productVariant, CancellationToken cancellationToken = default)
         {
             _appDbContext.ProductVariants.Update(productVariant);
-            return Task.CompletedTask;
+            InvalidateProductCache();
         }
 
-        // ==========================================
         // BASIC CRUD OPERATIONS - PRODUCT IMAGE
-        // ==========================================
         public async Task<ProductImage?> GetProductImageByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
             return await _appDbContext.ProductImages
@@ -272,12 +268,16 @@ namespace EComAPI.Infrastructure.Products.Persistence.Repositories
         public async Task AddProductImageAsync(ProductImage productImage, CancellationToken cancellationToken = default)
         {
             await _appDbContext.ProductImages.AddAsync(productImage, cancellationToken);
+            InvalidateProductCache();
         }
 
-        public Task UpdateProductImageAsync(ProductImage productImage, CancellationToken cancellationToken = default)
+        public async Task UpdateProductImageAsync(ProductImage productImage, CancellationToken cancellationToken = default)
         {
             _appDbContext.ProductImages.Update(productImage);
-            return Task.CompletedTask;
+            InvalidateProductCache();
         }
+
+        private void InvalidateProductCache()
+            => _cacheInvalidationBuffer.MarkNamespaceDirty(CacheKeys.ProductsNamespace);
     }
 }

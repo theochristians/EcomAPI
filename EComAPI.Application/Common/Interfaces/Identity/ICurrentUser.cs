@@ -6,5 +6,6 @@
         string? Email { get; }
         string? FullName { get; }
         bool IsAuthenticated { get; }
+        bool HasPermission(string permission);
     }
 }
