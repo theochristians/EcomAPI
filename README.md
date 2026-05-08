@@ -1,271 +1,200 @@
-﻿# EComAPI
+# Thrifties E-Commerce Backend API (EComAPI)
 
-Backend API e-commerce berbasis .NET 8 dengan Clean Architecture.
+![.NET Version](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)
+![Architecture](https://img.shields.io/badge/Architecture-Clean%20Architecture-success)
+![License](https://img.shields.io/badge/License-MIT-blue)
+
+Backend API untuk platform e-commerce **Thrifties**, dibangun menggunakan **.NET 8** dan mengimplementasikan **Clean Architecture**. Sistem ini dirancang dengan fokus pada skalabilitas, maintainability, clean code, dan keamanan yang siap digunakan di environment production.
+
+---
+
+## Daftar Isi
+
+- [Arsitektur](#arsitektur)
+- [Teknologi Utama](#teknologi-utama)
+- [Fitur Utama](#fitur-utama)
+- [Prasyarat](#prasyarat)
+- [Struktur Proyek](#struktur-proyek)
+- [Cara Menjalankan Proyek](#cara-menjalankan-proyek)
+- [Konfigurasi Environment](#konfigurasi-environment)
+- [Pengujian (Testing)](#pengujian-testing)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [Dokumentasi Tambahan](#dokumentasi-tambahan)
+
+---
 
 ## Arsitektur
 
-Solusi ini dipisah menjadi layer berikut:
+Solusi ini memisahkan concern secara ketat mengikuti prinsip **Clean Architecture**, yang terbagi menjadi beberapa layer:
 
-- `EComAPI.Domain`: entity, value object, dan aturan bisnis.
-- `EComAPI.Application`: use case (commands/queries), contract interface, validasi alur aplikasi.
-- `EComAPI.Infrastructure`: implementasi teknis (EF Core, repository, caching, security).
-- `EComAPI.API`: HTTP API, auth/authorization middleware, Swagger, rate limiting.
-- `tests/EComAPI.Application.Tests`: unit tests application layer.
-- `tests/EComAPI.API.Tests`: integration tests API layer.
+- **`EComAPI.Domain`**: Core dari sistem. Berisi Entity, Value Object, Enum, dan aturan bisnis dasar. Tidak bergantung pada infrastruktur maupun external framework apapun.
+- **`EComAPI.Application`**: Use Case aplikasi (Implementasi CQRS dengan Commands/Queries), Contract/Interfaces, DTOs, dan validasi bisnis. Layer ini mengkoordinasikan interaksi dari layer Domain.
+- **`EComAPI.Infrastructure`**: Implementasi teknis eksternal seperti Entity Framework Core (Database), Repository, Caching (Redis), integrasi Email SMTP, dan Security (JWT, Hashing).
+- **`EComAPI.API`**: Presentation layer berupa HTTP Web API. Menangani routing, auth/authorization middleware, konfigurasi Swagger, error handling global, dan rate limiting.
+- **`tests/EComAPI.Application.Tests`**: Unit Tests komprehensif untuk layer Application.
+- **`tests/EComAPI.API.Tests`**: Integration Tests end-to-end untuk endpoints API.
+
+---
+
+## Teknologi Utama
+
+- **Framework**: .NET 8 (C# 12)
+- **Database**: SQL Server & Entity Framework Core 8
+- **Caching**: Redis (Upstash) dengan In-Memory Cache Fallback
+- **Security**: JWT Authentication, BCrypt Password Hashing, Role & Permission-based Authorization
+- **Storage**: Azure Blob Storage (SAS Token generation for direct client upload)
+- **Email Service**: Brevo SMTP (dilengkapi Fallback Console Logger untuk dev lokal)
+- **Testing**: xUnit, Moq, FluentAssertions
+- **Dokumentasi API**: Swagger / OpenAPI
+
+---
 
 ## Fitur Utama
 
-- JWT auth: register, login, refresh token, logout.
-- Email verification OTP (public send/verify) dan login hanya untuk email terverifikasi.
-- Forgot password berbasis OTP (`forgot-password` + `reset-password`).
-- Token blacklist dengan audit DB + cache Redis/InMemory.
-- Permission-based authorization.
-- Modul user profile dan address.
-- Modul category dan product (termasuk variant/image).
-- Modul shopping: cart dan wishlist.
-- Modul transaction: order, coupon, review, return, order status log, stock log.
-- Rate limiting untuk endpoint auth dan email verification.
+- **Authentication & Authorization**: JWT (Register, Login, Refresh Token, Logout), OTP Forgot & Reset Password.
+- **Keamanan**: Token Blacklist (DB + Redis), Rate Limiting per endpoint (Brute-force protection), Strict Permission Handling.
+- **Verifikasi Email**: Registrasi diwajibkan melalui proses verifikasi Email OTP.
+- **Manajemen User**: Manajemen Profil pengguna dan multi-Alamat pengiriman.
+- **Katalog Produk**: Manajemen Kategori, Produk, Varian, dan integrasi gambar eksternal (Azure Blob).
+- **Shopping & Order**: Cart (Keranjang Belanja), Wishlist, Checkout, dan pembuatan Order (Pesanan).
+- **Transaksi**: Sistem Kupon Diskon, Ulasan produk (Review), Pengembalian barang (Return), Tracking Status Order, dan Log Stok otomatis (Stock Auditing).
+
+---
 
 ## Prasyarat
 
-- .NET SDK 8.x
-- SQL Server (Express/Developer/Azure SQL boleh)
+Pastikan sistem Anda telah menginstal komponen berikut sebelum menjalankan aplikasi:
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- SQL Server (Express / Developer / Azure SQL)
+- *(Opsional)* Redis server atau Upstash account
+- *(Opsional)* Azure Storage Account (untuk upload gambar)
+- *(Opsional)* Akun SMTP (misal Brevo) untuk pengiriman email
 
-## Menjalankan Project
+---
 
-1. Restore dependencies:
+## Struktur Proyek
 
-```powershell
-dotnet restore
+```text
+EComAPI/
+├── src/
+│   ├── EComAPI.API/            # Presentation Layer
+│   ├── EComAPI.Application/    # Business Logic Layer
+│   ├── EComAPI.Domain/         # Core Domain Layer
+│   └── EComAPI.Infrastructure/ # Data Access & External Services Layer
+├── tests/
+│   ├── EComAPI.API.Tests/         # Integration Tests
+│   └── EComAPI.Application.Tests/ # Unit Tests
+├── .env.example                # Template Environment Variables
+├── azure-pipelines.yml         # CI/CD Azure DevOps Pipeline
+└── EComAPI.sln                 # .NET Solution File
 ```
 
-2. Update database dari migration yang sudah ada:
+---
 
-```powershell
-dotnet ef database update --project EComAPI.Infrastructure --startup-project EComAPI.API
+## Cara Menjalankan Proyek
+
+1. **Clone Repository dan Masuk ke Direktori**
+   ```bash
+   git clone <url-repo>
+   cd EComAPI
+   ```
+
+2. **Restore Dependencies**
+   ```bash
+   dotnet restore
+   ```
+
+3. **Terapkan Migrasi Database**
+   Pastikan connection string sudah dikonfigurasi dengan benar sebelum menjalankan perintah ini.
+   ```bash
+   dotnet ef database update --project EComAPI.Infrastructure --startup-project EComAPI.API
+   ```
+
+4. **Jalankan Aplikasi**
+   ```bash
+   dotnet run --project EComAPI.API
+   ```
+
+5. **Akses Swagger UI**
+   Buka browser dan akses salah satu URL berikut untuk dokumentasi interaktif dan uji coba API:
+   - `http://localhost:5006/swagger`
+   - `https://localhost:7091/swagger`
+
+> **Catatan Seeder**: Saat startup pertama kali, API akan secara otomatis menjalankan *Seeder* untuk membuat Role, Permission dasar, dan user `SYSTEM`.
+
+---
+
+## Konfigurasi Environment
+
+Aplikasi ini menggunakan banyak variabel lingkungan. Untuk pengembangan lokal, sangat disarankan menggunakan **Secret Manager**, sedangkan untuk Staging/Production menggunakan Environment Variables.
+
+### Menggunakan .NET User Secrets (Local Dev)
+Buka terminal di dalam folder `EComAPI.API` dan jalankan:
+```bash
+# Konfigurasi Database
+dotnet user-secrets set "ConnectionStrings:SQLServerThrifted" "Server=.;Database=ThriftedDb;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=True;"
+
+# Konfigurasi JWT
+dotnet user-secrets set "JwtSettings:Secret" "<YOUR_SUPER_SECRET_KEY_MIN_32_CHARS>"
 ```
 
-3. Run API:
+### Variabel Lingkungan Tersedia
 
-```powershell
-dotnet run --project EComAPI.API
-```
+Berikut adalah tabel variabel utama yang dibutuhkan *(Selengkapnya dapat dilihat pada file `.env.example`)*:
 
-4. Buka Swagger:
+| Kategori | Kunci Konfigurasi | Deskripsi |
+|-------|----------------------------|-----------|
+| **Database** | `ConnectionStrings:SQLServerThrifted` | Connection string SQL Server utama |
+| **JWT** | `JwtSettings:Secret`, `Issuer`, `Audience` | Pengaturan enkripsi dan validitas JWT |
+| **Redis** | `Redis:Enabled`, `Redis:Url`, `Redis:Token` | Konfigurasi Upstash REST / Redis |
+| **Email** | `Email:SmtpHost`, `Email:SmtpUsername`, dst | SMTP credentials (Brevo) untuk OTP Email |
+| **Azure Blob** | `AzureBlobStorage:AccountName`, dst | Kredensial generate SAS URI upload file ke Azure |
+| **Rate Limit** | `RateLimiting:AuthLogin:PermitLimit`, dst | Limitasi jumlah request endpoint kritikal |
 
-- `http://localhost:5006/swagger`
-- `https://localhost:7091/swagger`
+---
 
-## Konfigurasi Penting
+## Pengujian (Testing)
 
-### Secret Manager / Environment Variables (Recommended)
+Proyek ini dilengkapi dengan Unit Test dan Integration Test untuk memastikan kualitas kode tetap terjaga.
 
-Jangan simpan credential production di `appsettings*.json`.
-Gunakan:
-
-1. `dotnet user-secrets` untuk local development.
-2. Environment variable / CI secret manager untuk staging & production.
-
-Project API sudah diaktifkan `UserSecretsId` agar bisa langsung pakai user-secrets.
-
-Contoh set local secret:
-
-```powershell
-dotnet user-secrets --project EComAPI.API set "ConnectionStrings:SQLServerThrifted" "Server=.;Database=ThriftedDb;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=True;"
-dotnet user-secrets --project EComAPI.API set "JwtSettings:Secret" "<JWT_SECRET>"
-dotnet user-secrets --project EComAPI.API set "AzureBlobStorage:Enabled" "true"
-dotnet user-secrets --project EComAPI.API set "AzureBlobStorage:AccountName" "<STORAGE_ACCOUNT>"
-dotnet user-secrets --project EComAPI.API set "AzureBlobStorage:ContainerName" "<CONTAINER>"
-dotnet user-secrets --project EComAPI.API set "AzureBlobStorage:TenantId" "<TENANT_ID>"
-dotnet user-secrets --project EComAPI.API set "AzureBlobStorage:ClientId" "<CLIENT_ID>"
-dotnet user-secrets --project EComAPI.API set "AzureBlobStorage:ClientSecret" "<CLIENT_SECRET>"
-```
-
-Contoh set environment variable (PowerShell):
-
-```powershell
-$env:ConnectionStrings__SQLServerThrifted = "<CONNECTION_STRING>"
-$env:JwtSettings__Secret = "<JWT_SECRET>"
-$env:AzureBlobStorage__Enabled = "true"
-$env:AzureBlobStorage__AccountName = "<STORAGE_ACCOUNT>"
-$env:AzureBlobStorage__ContainerName = "<CONTAINER>"
-$env:AzureBlobStorage__TenantId = "<TENANT_ID>"
-$env:AzureBlobStorage__ClientId = "<CLIENT_ID>"
-$env:AzureBlobStorage__ClientSecret = "<CLIENT_SECRET>"
-```
-
-Template key lengkap tersedia di:
-
-- [.env.example](.env.example)
-
-### Database
-
-- Connection string key: `ConnectionStrings:SQLServerThrifted`
-
-Catatan design-time EF:
-`AppDbContextFactory` saat ini membaca connection string dari
-`EComAPI.API/appsettings.json` (key `ConnectionStrings:SQLServerThrifted`).
-
-### JWT
-
-- `JwtSettings:Secret`
-- `JwtSettings:Issuer`
-- `JwtSettings:Audience`
-- `JwtSettings:ExpiryMinutes`
-
-### Token Blacklist
-
-- `TokenBlacklist:FallbackMinutes`
-- `TokenBlacklist:MaxMinutes`
-- `TokenBlacklist:CleanupIntervalMinutes`
-
-### Rate Limiting
-
-Section config yang dipakai:
-
-- `RateLimiting:RejectionMessage`
-- `RateLimiting:AuthRegister:PermitLimit`
-- `RateLimiting:AuthRegister:WindowMinutes`
-- `RateLimiting:AuthLogin:PermitLimit`
-- `RateLimiting:AuthLogin:WindowMinutes`
-- `RateLimiting:EmailVerifySend:PermitLimit`
-- `RateLimiting:EmailVerifySend:WindowMinutes`
-- `RateLimiting:EmailVerifyCheck:PermitLimit`
-- `RateLimiting:EmailVerifyCheck:WindowMinutes`
-- `RateLimiting:UploadSas:PermitLimit`
-- `RateLimiting:UploadSas:WindowMinutes`
-- `RateLimiting:UploadConfirm:PermitLimit`
-- `RateLimiting:UploadConfirm:WindowMinutes`
-
-### Redis (Upstash REST)
-
-Bisa pakai config file atau env var:
-
-- `Redis:Enabled`
-- `Redis:Url`
-- `Redis:Token`
-- `Redis:InstanceName`
-- `REDIS_URL` (env)
-- `REDIS_TOKEN` (env)
-
-Jika Redis tidak aktif/credential kosong, service fallback ke in-memory cache.
-
-### Email (Brevo SMTP)
-
-OTP email verification akan dikirim melalui Brevo SMTP jika konfigurasi valid.
-Jika tidak valid/nonaktif, service fallback ke `ConsoleEmailSender`.
-
-- `Email:Enabled`
-- `Email:SmtpHost` (default: `smtp-relay.brevo.com`)
-- `Email:SmtpPort` (default: `587`)
-- `Email:SmtpUsername`
-- `Email:SmtpPassword`
-- `Email:FromEmail`
-- `Email:FromName`
-- `Email:BrandName` (default: `Thrifties`)
-- `Email:BrandDomain` (default: `thrifties.app`)
-- `Email:LogoUrl` (opsional, URL HTTPS logo brand)
-- `Email:EnableSsl`
-
-Env var yang didukung:
-
-- `EMAIL_ENABLED`
-- `EMAIL_SMTP_HOST`
-- `EMAIL_SMTP_PORT`
-- `EMAIL_SMTP_USERNAME`
-- `EMAIL_SMTP_PASSWORD`
-- `EMAIL_FROM_EMAIL`
-- `EMAIL_FROM_NAME`
-- `EMAIL_BRAND_NAME`
-- `EMAIL_BRAND_DOMAIN`
-- `EMAIL_LOGO_URL`
-- `EMAIL_ENABLE_SSL`
-
-### Azure Blob Storage (SAS Upload)
-
-Fitur ini dipakai untuk direct upload dari frontend ke Azure Blob (backend hanya generate SAS).
-
-- `AzureBlobStorage:Enabled`
-- `AzureBlobStorage:AccountName`
-- `AzureBlobStorage:ContainerName`
-- `AzureBlobStorage:TenantId`
-- `AzureBlobStorage:ClientId`
-- `AzureBlobStorage:ClientSecret`
-
-Env var yang didukung:
-
-- `AZURE_STORAGE_ACCOUNT_NAME`
-- `AZURE_STORAGE_CONTAINER`
-- `AZURE_TENANT_ID`
-- `AZURE_CLIENT_ID`
-- `AZURE_CLIENT_SECRET`
-
-## Seeder Default
-
-Saat startup, API menjalankan seeder role, permission, dan SYSTEM user.
-
-## Testing
-
-Jalankan semua test:
-
-```powershell
+**Menjalankan Seluruh Test:**
+```bash
 dotnet test
 ```
 
-Jalankan per test project:
-
-```powershell
+**Menjalankan Spesifik Test Project:**
+```bash
+# Menjalankan Unit Tests (Application Layer)
 dotnet test tests/EComAPI.Application.Tests/EComAPI.Application.Tests.csproj
+
+# Menjalankan Integration Tests (API Layer)
 dotnet test tests/EComAPI.API.Tests/EComAPI.API.Tests.csproj
 ```
 
-Dokumentasi test detail ada di [tests/README.md](tests/README.md).
+*(Dokumentasi detail mengenai testing dapat dibaca di [tests/README.md](tests/README.md))*
 
-## CI (Azure DevOps)
+---
 
-Repository ini sekarang punya pipeline YAML di root:
+## CI/CD Pipeline
 
-- `azure-pipelines.yml`
+Proyek ini telah memiliki skenario integrasi yang terhubung dengan **Azure DevOps Pipeline** (`azure-pipelines.yml`).
+Pipeline akan dieksekusi secara otomatis dan mencakup tahapan berikut:
+1. Menggunakan self-hosted agent pool dari variable `AgentPoolName`.
+2. Restore `.sln` dan dependencies.
+3. Build Project (dengan konfigurasi `Release`).
+4. Eksekusi Unit Test `EComAPI.Application.Tests`.
+5. Eksekusi Integration Test otomatis (jika variabel pipeline `runApiIntegrationTests` bernilai `true`).
+6. Publikasi Test Result (`.trx`) dan Code Coverage (berformat Cobertura).
 
-Pipeline akan:
+---
 
-- Menggunakan self-hosted agent pool dari variable `AgentPoolName`.
-- Restore solution `EComAPI.sln`
-- Build solution (`Release`)
-- Menjalankan unit test `EComAPI.Application.Tests` (default)
-- Menjalankan API integration test `EComAPI.API.Tests` hanya jika variable `runApiIntegrationTests=true`
-- Publish test result (`.trx`) dan code coverage (Cobertura)
+## Dokumentasi Tambahan
 
-Langkah setup di Azure DevOps Project Settings / Pipelines:
+Untuk panduan operasional lebih lanjut, silakan baca dokumen berikut:
 
-1. Buka Azure DevOps project yang terhubung ke repo ini.
-2. Masuk ke **Pipelines** -> **New pipeline**.
-3. Pilih source repository ini, lalu pilih **Existing Azure Pipelines YAML file**.
-4. Pilih file `/azure-pipelines.yml` dari branch `TheoDev`.
-5. Klik **Run** untuk verifikasi awal.
+- **[Demo & Smoke Testing Manual](EComAPI.API/LIVE_DEMO_TESTING.md)** - Urutan flow manual sistem end-to-end (Auth -> Catalog -> Order -> Review -> Return -> Logout).
+- **[Timezone Policy](TIME_POLICY.md)** - Aturan standardisasi waktu UTC vs Jakarta Time (WIB) pada sistem dan database.
 
-Opsional tapi direkomendasikan:
+---
 
-1. Aktifkan **Build Validation** di branch policy (mis. branch `TheoDev` atau `main`) agar PR wajib lolos CI.
-2. Buat **Library -> Variable groups** lalu mapping ke pipeline, dan pastikan ada variable `AgentPoolName` berisi nama pool self-hosted yang valid.
-3. Aktifkan permission **Allow scripts to access the OAuth token** hanya jika ada kebutuhan akses API DevOps dari script.
-4. Saat API integration test sudah stabil, set variable pipeline `runApiIntegrationTests=true`.
-
-## Manual Demo / Smoke Flow
-
-Flow manual end-to-end ada di:
-
-- [EComAPI.API/LIVE_DEMO_TESTING.md](EComAPI.API/LIVE_DEMO_TESTING.md)
-
-Dokumen tersebut berisi urutan test manual Auth -> Catalog -> Cart/Order -> Review/Return -> Refresh/Logout.
-
-## Timezone Policy
-
-Aturan penggunaan waktu Jakarta vs UTC ada di:
-
-- [TIME_POLICY.md](TIME_POLICY.md)
-
-## Catatan Deployment
-
-- Jangan deploy dari worktree yang masih banyak perubahan campuran.
-- Simpan secret production di environment variable atau secret manager, bukan hardcoded di `appsettings`.
+> *Dibuat dengan dedikasi tinggi sebagai Backend Portofolio berskala Enterprise berbasis **.NET Clean Architecture**.*
